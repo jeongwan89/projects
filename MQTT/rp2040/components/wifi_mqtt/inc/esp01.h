@@ -15,9 +15,9 @@ typedef struct {
     const char* password;
 } esp01_config_t;
 
-void esp01_hardware_reset(const esp01_config_t* cfg);
-bool esp01_init(const esp01_config_t* cfg);
-bool wifi_connect(const esp01_config_t* cfg);
+void esp01_hardware_reset(const esp01_config_t& cfg);
+bool esp01_init(const esp01_config_t& cfg);
+bool wifi_connect(const esp01_config_t& cfg);
 bool wifi_is_connected(void);
 
 #ifdef __cplusplus

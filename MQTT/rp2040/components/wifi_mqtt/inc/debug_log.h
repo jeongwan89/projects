@@ -1,8 +1,10 @@
 #ifndef DEBUG_LOG_H
 #define DEBUG_LOG_H
 
+
 #include <stdio.h>
 #include <stdbool.h>
+#include "mqtt_client.h"
 
 // 디버그 로그 모드 설정
 #define DEBUG_LOG_USB    1  // USB로 출력
@@ -22,7 +24,7 @@ void debug_log_init(void);
  * @brief 디버그 메시지 출력 (printf 대체용)
  * @param format printf 형식 문자열
  */
-void debug_printf(const char* format, ...);
+void debug_printf(const mqtt_client_config_t& cfg, const char* format, ...);
 
 /**
  * @brief MQTT를 통한 로그 전송 활성화

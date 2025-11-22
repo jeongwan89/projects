@@ -19,7 +19,7 @@ void debug_mqtt_enable(bool enable) {
 }
 
 
-void debug_printf(const mqtt_client_config_t* cfg, const char* format, ...) {
+void debug_printf(const mqtt_client_config_t& cfg, const char* format, ...) {
     va_list args;
 
     // USB 출력 (항상 또는 조건부)

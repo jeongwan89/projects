@@ -6,21 +6,21 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
-void esp01_hardware_reset(const esp01_config_t* cfg) {
+void esp01_hardware_reset(const esp01_config_t& cfg) {
     printf("=== ESP-01 하드웨어 리셋 시작 ===\n");
-    gpio_init(cfg->rst_pin);
-    gpio_set_dir(cfg->rst_pin, GPIO_OUT);
-    gpio_put(cfg->rst_pin, 0);
+    gpio_init(cfg.rst_pin);
+    gpio_set_dir(cfg.rst_pin, GPIO_OUT);
+    gpio_put(cfg.rst_pin, 0);
     printf("ESP-01 RST 핀을 LOW로 설정 (리셋 상태)\n");
     sleep_ms(500);
-    gpio_put(cfg->rst_pin, 1);
+    gpio_put(cfg.rst_pin, 1);
     printf("ESP-01 RST 핀을 HIGH로 설정 (리셋 해제)\n");
-    printf("ESP-01 부팅 대기 중 (%d ms)...\n", cfg->reset_delay_ms);
-    sleep_ms(cfg->reset_delay_ms);
+    printf("ESP-01 부팅 대기 중 (%d ms)...\n", cfg.reset_delay_ms);
+    sleep_ms(cfg.reset_delay_ms);
     printf("ESP-01 부팅 완료\n");
 }
 
-bool esp01_init(const esp01_config_t* cfg) {
+bool esp01_init(const esp01_config_t& cfg) {
     printf("=== ESP-01 초기화 ===\n");
     printf("AT 명령 테스트 중...\n");
     bool at_ok = false;
@@ -50,10 +50,10 @@ bool esp01_init(const esp01_config_t* cfg) {
     return true;
 }
 
-bool wifi_connect(const esp01_config_t* cfg) {
+bool wifi_connect(const esp01_config_t& cfg) {
     printf("=== WiFi 연결 ===\n");
     char cmd[128];
-    snprintf(cmd, sizeof(cmd), "AT+CWJAP=\"%s\",\"%s\"", cfg->ssid, cfg->password);
+    snprintf(cmd, sizeof(cmd), "AT+CWJAP=\"%s\",\"%s\"", cfg.ssid, cfg.password);
     for (int i = 0; i < 3; i++) {
         printf("WiFi 연결 시도 %d/3...\n", i + 1);
         send_at_command(cmd);

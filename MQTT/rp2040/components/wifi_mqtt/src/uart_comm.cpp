@@ -37,11 +37,11 @@ static void on_uart_rx() {
 	}
 }
 
-void uart_init_esp01(const uart_config_t* cfg) {
-	g_uart_id = cfg->uart_id;
-	g_tx_pin = cfg->tx_pin;
-	g_rx_pin = cfg->rx_pin;
-	uart_init(g_uart_id, cfg->baud_rate);
+void uart_init_esp01(const uart_config_t& cfg) {
+	g_uart_id = cfg.uart_id;
+	g_tx_pin = cfg.tx_pin;
+	g_rx_pin = cfg.rx_pin;
+	uart_init(g_uart_id, cfg.baud_rate);
 	gpio_set_function(g_tx_pin, GPIO_FUNC_UART);
 	gpio_set_function(g_rx_pin, GPIO_FUNC_UART);
 	uart_set_hw_flow(g_uart_id, false, false);

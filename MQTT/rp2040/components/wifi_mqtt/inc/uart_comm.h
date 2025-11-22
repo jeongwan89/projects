@@ -19,7 +19,7 @@ typedef struct {
 } uart_config_t;
 
 void clear_isr_buffer(void);
-void uart_init_esp01(const uart_config_t* cfg);
+void uart_init_esp01(const uart_config_t& cfg);
 void send_at_command(const char* cmd);
 bool wait_for_response(const char* expected, uint32_t timeout_ms);
 const char* get_rx_buffer(void);

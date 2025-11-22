@@ -8,13 +8,13 @@
 static bool mqtt_connected = false;
 static uint32_t last_publish_success = 0;
 
-bool mqtt_connect(const mqtt_client_config_t* cfg) {
+bool mqtt_connect(const mqtt_client_config_t& cfg) {
     printf("=== MQTT 연결 ===\n");
     char cmd[256];
     // MQTT 사용자 설정
     snprintf(cmd, sizeof(cmd),
              "AT+MQTTUSERCFG=0,1,\"%s\",\"%s\",\"%s\",0,0,\"\"",
-             cfg->client_id, cfg->username, cfg->password);
+             cfg.client_id, cfg.username, cfg.password);
     send_at_command(cmd);
     if (!wait_for_response("OK", 2000)) {
         printf("MQTT 사용자 설정 실패\n");
@@ -24,7 +24,7 @@ bool mqtt_connect(const mqtt_client_config_t* cfg) {
     // MQTT 연결 설정 (LWT 포함)
     snprintf(cmd, sizeof(cmd),
              "AT+MQTTCONNCFG=0,120,0,\"%s\",\"%s\",1,0",
-             cfg->topic_status, cfg->lwt_message);
+             cfg.lwt_topic, cfg.lwt_message);
     send_at_command(cmd);
     if (!wait_for_response("OK", 2000)) {
         printf("MQTT 연결 설정 실패\n");
@@ -34,7 +34,7 @@ bool mqtt_connect(const mqtt_client_config_t* cfg) {
     // MQTT 브로커 연결
     snprintf(cmd, sizeof(cmd),
              "AT+MQTTCONN=0,\"%s\",%d,0",
-             cfg->broker, cfg->port);
+             cfg.broker, cfg.port);
     send_at_command(cmd);
     // MQTT 연결 완료 대기 (MQTTCONNECTED 메시지 직접 기다림)
     printf("MQTT 연결 완료 대기 중...\n");
@@ -47,13 +47,13 @@ bool mqtt_connect(const mqtt_client_config_t* cfg) {
     mqtt_connected = true;
     // 연결 성공 시 online 상태 발행
     char status_cmd[128];
-    snprintf(status_cmd, sizeof(status_cmd), "AT+MQTTPUB=0,\"%s\",\"online\",1,1", cfg->topic_status);
+    snprintf(status_cmd, sizeof(status_cmd), "AT+MQTTPUB=0,\"%s\",\"online\",1,1", MQTT_TOPIC_STATUS);
     send_at_command(status_cmd);
     wait_for_response("OK", 2000);
     return true;
 }
 
-bool mqtt_subscribe(const mqtt_client_config_t* cfg, const char* topic) {
+bool mqtt_subscribe(const mqtt_client_config_t& cfg, const char* topic) {
     (void)cfg;
     if (!mqtt_connected) {
         printf("MQTT 연결되지 않음 - 구독 불가\n");
@@ -78,7 +78,7 @@ bool mqtt_subscribe(const mqtt_client_config_t* cfg, const char* topic) {
     return true;
 }
 
-bool mqtt_publish(const mqtt_client_config_t* cfg, const char* topic, const char* message) {
+bool mqtt_publish(const mqtt_client_config_t& cfg, const char* topic, const char* message) {
     (void)cfg;
     if (!mqtt_connected) {
         printf("[EVENT] MQTT 연결되지 않음 - 발행 불가\n");
@@ -119,7 +119,7 @@ bool mqtt_publish(const mqtt_client_config_t* cfg, const char* topic, const char
     return true;
 }
 
-void check_mqtt_messages(const mqtt_client_config_t* cfg) {
+void check_mqtt_messages(const mqtt_client_config_t& cfg) {
     (void)cfg;
     // MQTT 전용 버퍼로 데이터 읽기
     uart_read_mqtt_messages();
@@ -170,12 +170,12 @@ void check_mqtt_messages(const mqtt_client_config_t* cfg) {
     }
 }
 
-bool mqtt_is_connected(const mqtt_client_config_t* cfg) {
+bool mqtt_is_connected(const mqtt_client_config_t& cfg) {
     (void)cfg;
     return mqtt_connected;
 }
 
-void mqtt_disconnect(const mqtt_client_config_t* cfg) {
+void mqtt_disconnect(const mqtt_client_config_t& cfg) {
     (void)cfg;
     printf("=== MQTT 연결 해제 ===\n");
     send_at_command("AT+MQTTCLEAN=0");

@@ -5,6 +5,7 @@
 #include "esp01.h"
 #include "mqtt_client.h"
 #include "serial_bridge.h"
+#include "config.h"
 
 int main(void) {
 
@@ -24,16 +25,13 @@ int main(void) {
         .password = "wweerrtt"
     };
     mqtt_client_config_t mqtt_cfg = {
-        .broker = "192.168.0.24",
-        .port = 1883,
-        .client_id = "rp2040_client",
-        .username = "farmmain",
-        .password = "eerrtt",
-        .topic_alive = "test/rp2040/alive",
-        .topic_sensor = "test/rp2040/sensor",
-        .topic_control = "test/rp2040/control",
-        .topic_status = "test/rp2040/status",
-        .lwt_message = "offline"
+        .broker = MQTT_BROKER,
+        .port = MQTT_PORT,
+        .client_id = MQTT_CLIENT_ID,
+        .username = MQTT_USERNAME,
+        .password = MQTT_PASSWORD,
+        .lwt_topic = MQTT_TOPIC_STATUS,
+        .lwt_message = MQTT_LWT_MESSAGE
     };
 
     // USB CDC가 연결될 때까지 대기 (최대 5초)
@@ -46,7 +44,7 @@ int main(void) {
     printf("\n\n=== RP2040 ESP-01 MQTT 시작 ===\n");
 
     // UART 초기화
-    uart_init_esp01(&uart_cfg);
+    uart_init_esp01(uart_cfg);
 
     // ESP-01 초기화 및 WiFi 연결 루프 (무한 재시도)
     bool wifi_ok = false;
@@ -55,13 +53,13 @@ int main(void) {
         if (retry_count > 0) {
             printf("\n=== 전체 재시도 %d ===\n", retry_count + 1);
         }
-        esp01_hardware_reset(&esp_cfg);
-        if (!esp01_init(&esp_cfg)) {
+        esp01_hardware_reset(esp_cfg);
+        if (!esp01_init(esp_cfg)) {
             printf("ESP-01 초기화 실패\n");
             printf("시리얼 브리지 모드로 전환합니다...\n");
             serial_bridge_mode();
         }
-        if (wifi_connect(&esp_cfg)) {
+        if (wifi_connect(esp_cfg)) {
             wifi_ok = true;
             break;
         }
@@ -74,16 +72,16 @@ int main(void) {
     sleep_ms(2000);
 
     // MQTT 연결
-    if (!mqtt_connect(&mqtt_cfg)) {
+    if (!mqtt_connect(mqtt_cfg)) {
         printf("MQTT 연결 실패\n");
         return -1;
     }
 
     // 제어 토픽 구독
-    mqtt_subscribe(&mqtt_cfg, mqtt_cfg.topic_control);
+    mqtt_subscribe(mqtt_cfg, MQTT_TOPIC_CONTROL);
 
     // Alive 메시지 발행
-    mqtt_publish(&mqtt_cfg, mqtt_cfg.topic_alive, "RP2040 Online");
+    mqtt_publish(mqtt_cfg, MQTT_TOPIC_ALIVE, "RP2040 Online");
 
     printf("=== 메인 루프 시작 ===\n");
 
@@ -94,12 +92,12 @@ int main(void) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
 
         // MQTT 연결 상태 확인 및 재연결
-        if (!mqtt_is_connected(&mqtt_cfg)) {
+        if (!mqtt_is_connected(mqtt_cfg)) {
             printf("⚠️  MQTT 연결 끊김 감지 - 재연결 시도\n");
-            // TODO: mqtt_reconnect(&mqtt_cfg, &esp_cfg) 구현 및 호출
-            // if (mqtt_reconnect(&mqtt_cfg, &esp_cfg)) {
+            // TODO: mqtt_reconnect(mqtt_cfg, esp_cfg) 구현 및 호출
+            // if (mqtt_reconnect(mqtt_cfg, esp_cfg)) {
             //     printf("✅ MQTT 재연결 성공\n");
-            //     mqtt_publish(&mqtt_cfg, mqtt_cfg.topic_alive, "reconnected");
+            //     mqtt_publish(mqtt_cfg, MQTT_TOPIC_ALIVE, "reconnected");
             //     last_alive_send = now;
             // } else {
             //     printf("❌ MQTT 재연결 실패 - 5초 후 재시도\n");
@@ -115,7 +113,7 @@ int main(void) {
             float humidity = 60.0;    // TODO: 실제 센서 값 읽기
             snprintf(sensor_data, sizeof(sensor_data), "{\"temp\":%.1f,\"hum\":%.1f}", temperature, humidity);
             printf("센서 데이터 발행: %s\n", sensor_data);
-            if (mqtt_publish(&mqtt_cfg, mqtt_cfg.topic_sensor, sensor_data)) {
+            if (mqtt_publish(mqtt_cfg, MQTT_TOPIC_SENSOR, sensor_data)) {
                 last_sensor_send = now;
             } else {
                 printf("센서 데이터 발행 실패 - 다음 사이클에 재시도\n");
@@ -125,7 +123,7 @@ int main(void) {
         // Alive 메시지 전송 (60초마다)
         if (now - last_alive_send > 60000) {
             printf("Alive 메시지 발행\n");
-            if (mqtt_publish(&mqtt_cfg, mqtt_cfg.topic_alive, "alive")) {
+            if (mqtt_publish(mqtt_cfg, MQTT_TOPIC_ALIVE, "alive")) {
                 last_alive_send = now;
             } else {
                 printf("Alive 메시지 발행 실패 - 다음 사이클에 재시도\n");
@@ -133,7 +131,7 @@ int main(void) {
         }
 
         // MQTT 메시지 수신 확인 (자주 체크)
-        check_mqtt_messages(&mqtt_cfg);
+        check_mqtt_messages(mqtt_cfg);
 
         sleep_ms(50);
     }
