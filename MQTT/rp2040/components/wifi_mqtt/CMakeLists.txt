@@ -8,7 +8,6 @@ add_library(wifi_mqtt STATIC
     src/uart_comm.cpp
     src/esp01.cpp
     src/mqtt_client.cpp
-    src/debug_log.cpp
     src/serial_bridge.cpp
 )
 
