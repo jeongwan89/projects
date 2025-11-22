@@ -1,3 +1,5 @@
+#include "uart_comm.h"
+void esp01_set_uart_config(const uart_config_t* cfg);
 
 #ifndef ESP01_H
 #define ESP01_H

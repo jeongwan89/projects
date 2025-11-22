@@ -6,6 +6,10 @@
 #include "hardware/uart.h"
 #include "hardware/irq.h"
 
+
+// 전역 static 포인터로 현재 UART 설정을 보관 (IRQ 핸들러에서 사용)
+static const uart_config_t* s_uart_cfg = NULL;
+
 #define RX_BUFFER_SIZE 1024
 
 static volatile char rx_buffer[RX_BUFFER_SIZE];
@@ -15,14 +19,12 @@ static volatile uint16_t isr_read_pos = 0;
 static char mqtt_buffer[RX_BUFFER_SIZE];
 static size_t mqtt_buf_len = 0;
 
-uart_inst_t* g_uart_id = uart1;
-static int g_tx_pin = 4;
-static int g_rx_pin = 5;
-
-// UART 인터럽트 핸들러
+// UART 인터럽트 핸들러 (Pico SDK는 context 인자 미지원)
 static void on_uart_rx() {
-	while (uart_is_readable(g_uart_id)) {
-		char ch = uart_getc(g_uart_id);
+	if (!s_uart_cfg) return;
+	while (uart_is_readable(s_uart_cfg->uart_id)) {
+		char ch = uart_getc(s_uart_cfg->uart_id);
+		printf("[UART RX IRQ] 0x%02X ('%c')\n", (unsigned char)ch, (ch >= 32 && ch < 127) ? ch : '.');
 		uint16_t next_pos = (isr_write_pos + 1);
 		if (next_pos >= RX_BUFFER_SIZE) next_pos = 0; // wrap-around
 		if (next_pos != isr_read_pos) { // 버퍼 오버플로 방지
@@ -38,30 +40,28 @@ static void on_uart_rx() {
 }
 
 void uart_init_esp01(const uart_config_t& cfg) {
-	g_uart_id = cfg.uart_id;
-	g_tx_pin = cfg.tx_pin;
-	g_rx_pin = cfg.rx_pin;
-	uart_init(g_uart_id, cfg.baud_rate);
-	gpio_set_function(g_tx_pin, GPIO_FUNC_UART);
-	gpio_set_function(g_rx_pin, GPIO_FUNC_UART);
-	uart_set_hw_flow(g_uart_id, false, false);
-	uart_set_format(g_uart_id, 8, 1, UART_PARITY_NONE);
-	uart_set_fifo_enabled(g_uart_id, true);
-	// 인터럽트 등록
-	if (g_uart_id == uart1) {
+	s_uart_cfg = &cfg;
+	uart_init(cfg.uart_id, cfg.baud_rate);
+	gpio_set_function(cfg.tx_pin, GPIO_FUNC_UART);
+	gpio_set_function(cfg.rx_pin, GPIO_FUNC_UART);
+	uart_set_hw_flow(cfg.uart_id, false, false);
+	uart_set_format(cfg.uart_id, 8, 1, UART_PARITY_NONE);
+	uart_set_fifo_enabled(cfg.uart_id, true);
+	// 인터럽트 등록 (Pico SDK는 context 인자 미지원)
+	if (cfg.uart_id == uart1) {
 		irq_set_exclusive_handler(UART1_IRQ, on_uart_rx);
 		irq_set_enabled(UART1_IRQ, true);
-	} else if (g_uart_id == uart0) {
+	} else if (cfg.uart_id == uart0) {
 		irq_set_exclusive_handler(UART0_IRQ, on_uart_rx);
 		irq_set_enabled(UART0_IRQ, true);
 	}
-	uart_set_irq_enables(g_uart_id, true, false);
+	uart_set_irq_enables(cfg.uart_id, true, false);
 	clear_isr_buffer();
 }
 
-void send_at_command(const char* cmd) {
-	uart_puts(g_uart_id, cmd);
-	uart_puts(g_uart_id, "\r\n");
+void send_at_command(const uart_config_t& cfg, const char* cmd) {
+	uart_puts(cfg.uart_id, cmd);
+	uart_puts(cfg.uart_id, "\r\n");
 }
 
 bool wait_for_response(const char* expected, uint32_t timeout_ms) {

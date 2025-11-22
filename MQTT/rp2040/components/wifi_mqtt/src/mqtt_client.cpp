@@ -1,9 +1,17 @@
-#include "mqtt_client.h"
-#include "uart_comm.h"
+
 #include "esp01.h"
+#include "uart_comm.h"
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
+#include "mqtt_client.h"
+
+// UART 설정을 위한 전역 포인터 (main에서 할당)
+static const uart_config_t* uart_cfg_ptr = NULL;
+
+void mqtt_client_set_uart_config(const uart_config_t* cfg) {
+    uart_cfg_ptr = cfg;
+}
 
 static bool mqtt_connected = false;
 static uint32_t last_publish_success = 0;
@@ -15,7 +23,7 @@ bool mqtt_connect(const mqtt_client_config_t& cfg) {
     snprintf(cmd, sizeof(cmd),
              "AT+MQTTUSERCFG=0,1,\"%s\",\"%s\",\"%s\",0,0,\"\"",
              cfg.client_id, cfg.username, cfg.password);
-    send_at_command(cmd);
+    send_at_command(*uart_cfg_ptr, cmd);
     if (!wait_for_response("OK", 2000)) {
         printf("MQTT 사용자 설정 실패\n");
         return false;
@@ -25,7 +33,7 @@ bool mqtt_connect(const mqtt_client_config_t& cfg) {
     snprintf(cmd, sizeof(cmd),
              "AT+MQTTCONNCFG=0,120,0,\"%s\",\"%s\",1,0",
              cfg.lwt_topic, cfg.lwt_message);
-    send_at_command(cmd);
+    send_at_command(*uart_cfg_ptr, cmd);
     if (!wait_for_response("OK", 2000)) {
         printf("MQTT 연결 설정 실패\n");
         return false;
@@ -35,7 +43,7 @@ bool mqtt_connect(const mqtt_client_config_t& cfg) {
     snprintf(cmd, sizeof(cmd),
              "AT+MQTTCONN=0,\"%s\",%d,0",
              cfg.broker, cfg.port);
-    send_at_command(cmd);
+    send_at_command(*uart_cfg_ptr, cmd);
     // MQTT 연결 완료 대기 (MQTTCONNECTED 메시지 직접 기다림)
     printf("MQTT 연결 완료 대기 중...\n");
     if (!wait_for_response("MQTTCONNECTED", 10000)) {
@@ -48,7 +56,7 @@ bool mqtt_connect(const mqtt_client_config_t& cfg) {
     // 연결 성공 시 online 상태 발행
     char status_cmd[128];
     snprintf(status_cmd, sizeof(status_cmd), "AT+MQTTPUB=0,\"%s\",\"online\",1,1", MQTT_TOPIC_STATUS);
-    send_at_command(status_cmd);
+    send_at_command(*uart_cfg_ptr, status_cmd);
     wait_for_response("OK", 2000);
     return true;
 }
@@ -64,7 +72,7 @@ bool mqtt_subscribe(const mqtt_client_config_t& cfg, const char* topic) {
     
     char cmd[128];
     snprintf(cmd, sizeof(cmd), "AT+MQTTSUB=0,\"%s\",1", topic);
-    send_at_command(cmd);
+    send_at_command(*uart_cfg_ptr, cmd);
     
     if (!wait_for_response("OK", 3000)) {
         printf("구독 실패\n");
@@ -93,7 +101,7 @@ bool mqtt_publish(const mqtt_client_config_t& cfg, const char* topic, const char
              "AT+MQTTPUBRAW=0,\"%s\",%d,1,0",
              topic, msg_len);
     printf("[TX] %s\n", cmd);
-    send_at_command(cmd);
+    send_at_command(*uart_cfg_ptr, cmd);
     
     // ">" 프롬프트 대기
     if (!wait_for_response(">", 2000)) {
@@ -103,8 +111,7 @@ bool mqtt_publish(const mqtt_client_config_t& cfg, const char* topic, const char
     }
     
     // 실제 메시지 전송 (개행 없이)
-    extern uart_inst_t* g_uart_id;
-    uart_puts(g_uart_id, message);
+    uart_puts(uart_cfg_ptr->uart_id, message);
     printf("[TX] Send Data: %s\n", message);
     
     if (!wait_for_response("OK", 3000)) {
@@ -178,11 +185,43 @@ bool mqtt_is_connected(const mqtt_client_config_t& cfg) {
 void mqtt_disconnect(const mqtt_client_config_t& cfg) {
     (void)cfg;
     printf("=== MQTT 연결 해제 ===\n");
-    send_at_command("AT+MQTTCLEAN=0");
+    send_at_command(*uart_cfg_ptr, "AT+MQTTCLEAN=0");
     wait_for_response("OK", 2000);  // 타임아웃 무시
     mqtt_connected = false;
     last_publish_success = 0;
     printf("MQTT 연결 해제 완료\n");
+}
+
+// MQTT 재연결: 연결 해제 → ESP-01 리셋/재초기화 → WiFi 재연결 → MQTT 재연결
+bool mqtt_reconnect(const mqtt_client_config_t& mqtt_cfg, const esp01_config_t& esp_cfg) {
+    // 1. MQTT 연결 해제
+    mqtt_disconnect(mqtt_cfg);
+    sleep_ms(500);
+
+    // 2. ESP-01 하드웨어 리셋
+    esp01_hardware_reset(esp_cfg);
+    sleep_ms(500);
+
+    // 3. ESP-01 재초기화
+    if (!esp01_init(esp_cfg)) {
+        printf("[RECONNECT] ESP-01 초기화 실패\n");
+        return false;
+    }
+
+    // 4. WiFi 재연결
+    if (!wifi_connect(esp_cfg)) {
+        printf("[RECONNECT] WiFi 재연결 실패\n");
+        return false;
+    }
+
+    // 5. MQTT 재연결
+    if (!mqtt_connect(mqtt_cfg)) {
+        printf("[RECONNECT] MQTT 재연결 실패\n");
+        return false;
+    }
+
+    printf("[RECONNECT] MQTT 재연결 성공\n");
+    return true;
 }
 
 

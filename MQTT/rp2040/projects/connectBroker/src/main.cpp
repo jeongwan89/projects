@@ -45,6 +45,8 @@ int main(void) {
 
     // UART 초기화
     uart_init_esp01(uart_cfg);
+    esp01_set_uart_config(&uart_cfg);
+    mqtt_client_set_uart_config(&uart_cfg);
 
     // ESP-01 초기화 및 WiFi 연결 루프 (무한 재시도)
     bool wifi_ok = false;
@@ -57,7 +59,7 @@ int main(void) {
         if (!esp01_init(esp_cfg)) {
             printf("ESP-01 초기화 실패\n");
             printf("시리얼 브리지 모드로 전환합니다...\n");
-            serial_bridge_mode();
+            serial_bridge_mode(&uart_cfg);
         }
         if (wifi_connect(esp_cfg)) {
             wifi_ok = true;
@@ -94,16 +96,15 @@ int main(void) {
         // MQTT 연결 상태 확인 및 재연결
         if (!mqtt_is_connected(mqtt_cfg)) {
             printf("⚠️  MQTT 연결 끊김 감지 - 재연결 시도\n");
-            // TODO: mqtt_reconnect(mqtt_cfg, esp_cfg) 구현 및 호출
-            // if (mqtt_reconnect(mqtt_cfg, esp_cfg)) {
-            //     printf("✅ MQTT 재연결 성공\n");
-            //     mqtt_publish(mqtt_cfg, MQTT_TOPIC_ALIVE, "reconnected");
-            //     last_alive_send = now;
-            // } else {
-            //     printf("❌ MQTT 재연결 실패 - 5초 후 재시도\n");
-            //     sleep_ms(5000);
-            //     continue;
-            // }
+            if (mqtt_reconnect(mqtt_cfg, esp_cfg)) {
+                printf("✅ MQTT 재연결 성공\n");
+                mqtt_publish(mqtt_cfg, MQTT_TOPIC_ALIVE, "reconnected");
+                last_alive_send = now;
+            } else {
+                printf("❌ MQTT 재연결 실패 - 5초 후 재시도\n");
+                sleep_ms(5000);
+                continue;
+            }
         }
 
         // 센서 데이터 전송 (10초마다)

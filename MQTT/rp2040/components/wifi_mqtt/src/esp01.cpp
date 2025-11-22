@@ -1,3 +1,15 @@
+#include "uart_comm.h"
+#include <stdio.h>
+#include <string.h>
+#include "pico/stdlib.h"
+#include "hardware/gpio.h"
+
+// UART 설정을 위한 전역 포인터 (main에서 할당)
+static const uart_config_t* uart_cfg_ptr = NULL;
+
+void esp01_set_uart_config(const uart_config_t* cfg) {
+    uart_cfg_ptr = cfg;
+}
 
 #include "esp01.h"
 #include "uart_comm.h"
@@ -21,11 +33,15 @@ void esp01_hardware_reset(const esp01_config_t& cfg) {
 }
 
 bool esp01_init(const esp01_config_t& cfg) {
+    if (!uart_cfg_ptr) {
+        printf("[esp01_init] UART config not set!\n");
+        return false;
+    }
     printf("=== ESP-01 초기화 ===\n");
     printf("AT 명령 테스트 중...\n");
     bool at_ok = false;
     for (int i = 0; i < 3; i++) {
-        send_at_command("AT");
+        send_at_command(*uart_cfg_ptr, "AT");
         if (wait_for_response("OK", 2000)) {
             at_ok = true;
             break;
@@ -38,10 +54,10 @@ bool esp01_init(const esp01_config_t& cfg) {
         return false;
     }
     printf("AT 응답 확인됨\n");
-    send_at_command("ATE0");
+    send_at_command(*uart_cfg_ptr, "ATE0");
     wait_for_response("OK", 2000);
     printf("WiFi 모드 설정 중...\n");
-    send_at_command("AT+CWMODE=1");
+    send_at_command(*uart_cfg_ptr, "AT+CWMODE=1");
     if (!wait_for_response("OK", 2000)) {
         printf("WiFi 모드 설정 실패\n");
         return false;
@@ -51,12 +67,16 @@ bool esp01_init(const esp01_config_t& cfg) {
 }
 
 bool wifi_connect(const esp01_config_t& cfg) {
+    if (!uart_cfg_ptr) {
+        printf("[wifi_connect] UART config not set!\n");
+        return false;
+    }
     printf("=== WiFi 연결 ===\n");
     char cmd[128];
     snprintf(cmd, sizeof(cmd), "AT+CWJAP=\"%s\",\"%s\"", cfg.ssid, cfg.password);
     for (int i = 0; i < 3; i++) {
         printf("WiFi 연결 시도 %d/3...\n", i + 1);
-        send_at_command(cmd);
+        send_at_command(*uart_cfg_ptr, cmd);
         if (wait_for_response("WIFI GOT IP", 15000)) {
             printf("WiFi 연결 성공\n");
             return true;
@@ -65,7 +85,7 @@ bool wifi_connect(const esp01_config_t& cfg) {
         if (i < 2) {
             printf("재시도 전 대기 중...\n");
             sleep_ms(2000);
-            send_at_command("AT+CWQAP");
+            send_at_command(*uart_cfg_ptr, "AT+CWQAP");
             wait_for_response("OK", 2000);
         }
     }
@@ -74,7 +94,11 @@ bool wifi_connect(const esp01_config_t& cfg) {
 }
 
 bool wifi_is_connected(void) {
-    send_at_command("AT+CIPSTATUS");
+    if (!uart_cfg_ptr) {
+        printf("[wifi_is_connected] UART config not set!\n");
+        return false;
+    }
+    send_at_command(*uart_cfg_ptr, "AT+CIPSTATUS");
     
     // 응답에서 STATUS:를 확인
     if (wait_for_response("STATUS:", 3000)) {
