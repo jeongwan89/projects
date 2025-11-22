@@ -107,7 +107,7 @@ int main(void) {
         
         // MQTT 메시지 수신 확인
         char topic[64], message[128];
-        if (mqtt_check_message(mqtt, topic, message, sizeof(message))) {
+        if (mqtt_check_message(mqtt, topic, sizeof(topic), message, sizeof(message))) {
             printf("[수신] %s: %s\n", topic, message);
             
             // 제어 명령 처리

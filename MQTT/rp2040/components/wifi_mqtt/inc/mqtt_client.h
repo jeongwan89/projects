@@ -29,7 +29,7 @@ bool mqtt_subscribe(MqttClient& client, const char* topic, int qos);
 bool mqtt_publish(MqttClient& client, const char* topic, const char* message, int qos, int retain);
 
 // MQTT 메시지 체크 (수신 확인)
-bool mqtt_check_message(MqttClient& client, char* topic, char* message, int max_len);
+bool mqtt_check_message(MqttClient& client, char* topic, int topic_max_len, char* message, int message_max_len);
 
 // MQTT 연결 상태
 bool mqtt_is_connected(MqttClient& client);
