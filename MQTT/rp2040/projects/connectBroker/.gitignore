@@ -1,0 +1,28 @@
+# Build directories
+build/
+cmake-build-*/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Generated files
+*.uf2
+*.bin
+*.hex
+*.elf
+*.map
+*.dis
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
