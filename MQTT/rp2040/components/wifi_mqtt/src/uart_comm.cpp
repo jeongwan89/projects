@@ -4,7 +4,7 @@
 #include "pico/stdlib.h"
 #include "hardware/irq.h"
 
-#define RX_BUFFER_SIZE 1024
+#define RX_BUFFER_SIZE 512
 
 static uart_inst_t* g_uart = NULL;
 static volatile char rx_buffer[RX_BUFFER_SIZE];
@@ -85,7 +85,7 @@ const char* uart_get_rx_buffer(void) {
     
     while (pos != rx_head && i < RX_BUFFER_SIZE - 1) {
         out_buf[i++] = rx_buffer[pos];
-        pos = (pos + 1) % RX_BUFFER_SIZE;
+        pos = (pos + 1) % RX_BUFFER_SIZE; // 간단하지만 안전한 원형 버퍼 읽기
     }
     out_buf[i] = '\0';
     return out_buf;
