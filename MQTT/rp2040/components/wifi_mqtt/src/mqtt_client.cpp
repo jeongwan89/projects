@@ -63,13 +63,13 @@ bool mqtt_connect(MqttClient& client) {
     }
     sleep_ms(300);
     
-    // 2. MQTT 연결 설정 (LWT)
+    // 2. MQTT 연결 설정 (LWT + keepalive 60초)
     if (strlen(client.lwt_topic) >= MAX_TOPIC_LEN) {
         printf("[MQTT] LWT 토픽 길이 초과\n");
         return false;
     }
     
-    cmd_len = snprintf(cmd, sizeof(cmd), "AT+MQTTCONNCFG=0,120,0,\"%s\",\"%s\",1,0",
+    cmd_len = snprintf(cmd, sizeof(cmd), "AT+MQTTCONNCFG=0,60,0,\"%s\",\"%s\",1,0",
                        client.lwt_topic, client.lwt_message);
     if (cmd_len >= (int)sizeof(cmd)) {
         printf("[MQTT] LWT 설정 명령어 버퍼 오버플로우\n");
@@ -101,6 +101,7 @@ bool mqtt_connect(MqttClient& client) {
     }
     
     client.connected = true;
+    client.last_activity = to_ms_since_boot(get_absolute_time());
     printf("[MQTT] 연결 성공\n");
     
     // 연결 성공 시 online 상태 발행
@@ -144,15 +145,25 @@ bool mqtt_subscribe(MqttClient& client, const char* topic, int qos) {
         return false;
     }
     
-    uart_send_at_command(cmd);
-    
-    if (!uart_wait_response("OK", 3000)) {
-        printf("[MQTT] 구독 실패\n");
-        return false;
+    // 재시도 로직 (최대 3회)
+    for (int i = 0; i < 3; i++) {
+        uart_clear_rx_buffer();
+        uart_send_at_command(cmd);
+        
+        if (uart_wait_response("OK", 3000)) {
+            printf("[MQTT] 구독 성공\n");
+            sleep_ms(300);
+            return true;
+        }
+        
+        printf("[MQTT] 구독 실패 (시도 %d/3)\n", i + 1);
+        if (i < 2) {
+            sleep_ms(1000);
+        }
     }
     
-    sleep_ms(300);
-    return true;
+    printf("[MQTT] 구독 최종 실패\n");
+    return false;
 }
 
 bool mqtt_publish(MqttClient& client, const char* topic, const char* message, int qos, int retain) {
@@ -229,6 +240,7 @@ bool mqtt_publish(MqttClient& client, const char* topic, const char* message, in
     }
     
     sleep_ms(100);
+    client.last_activity = to_ms_since_boot(get_absolute_time());
     return true;
 }
 
@@ -341,7 +353,8 @@ bool mqtt_check_message(MqttClient& client, char* topic, int topic_max_len, char
     // 실제 남은 데이터 길이 확인
     int remaining = buffer_end - p;
     if (remaining < data_len) {
-        printf("[MQTT] 경고: 예상 길이(%d)보다 실제 데이터 적음(%d)\n", data_len, remaining);
+        printf("[MQTT] 경고: 예상 길이(%d)보다 실제 데이터 적음(%d) - 자동 조정\n", data_len, remaining);
+        printf("[MQTT] 디버그: 원본 버퍼 길이=%d, 파싱 위치=%ld\n", len, (long)(p - buffer));
         data_len = remaining;
     }
     
@@ -359,6 +372,7 @@ bool mqtt_check_message(MqttClient& client, char* topic, int topic_max_len, char
     }
     
     printf("[MQTT] 파싱 성공 - 토픽: %s, 길이: %d\n", topic, data_len);
+    client.last_activity = to_ms_since_boot(get_absolute_time());
     return true;
 }
 
@@ -421,5 +435,25 @@ void mqtt_disconnect(MqttClient& client) {
         }
         client.connected = false;
         printf("[MQTT] 연결 해제\n");
+    }
+}
+
+void mqtt_keepalive(MqttClient& client) {
+    if (!client.connected) {
+        return;
+    }
+    
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    uint32_t elapsed = now - client.last_activity;
+    
+    // 30초 이상 활동 없으면 keepalive 메시지 발송
+    if (elapsed > 30000) {
+        // 빈 메시지를 LWT 토픽으로 발송 (keepalive 목적)
+        if (mqtt_publish(client, client.lwt_topic, "keepalive", 0, 0)) {
+            printf("[MQTT] Keepalive 전송 성공\n");
+        } else {
+            printf("[MQTT] Keepalive 실패 - 연결 끊김 가능성\n");
+            client.connected = false;
+        }
     }
 }

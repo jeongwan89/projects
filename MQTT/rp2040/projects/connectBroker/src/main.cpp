@@ -8,6 +8,38 @@
 #include "serial_bridge.h"
 #include "config.h"
 
+/**
+ * @brief MQTT 재연결 후 초기화 작업 수행
+ * 
+ * MQTT 브로커 재연결 시 필요한 모든 초기화 작업을 수행합니다:
+ * - 제어 토픽 재구독
+ * - 상태 토픽에 online 메시지 발행
+ * 
+ * @param mqtt MQTT 클라이언트 구조체
+ * @return true 모든 초기화 작업 성공
+ * @return false 초기화 작업 중 하나라도 실패
+ */
+bool mqtt_reinitialize_after_reconnect(MqttClient& mqtt) {
+    printf("[MQTT] 재연결 후 초기화 시작...\n");
+    
+    // 1. 제어 토픽 재구독
+    if (!mqtt_subscribe(mqtt, TOPIC_CONTROL, 0)) {
+        printf("[오류] 제어 토픽 재구독 실패: %s\n", TOPIC_CONTROL);
+        return false;
+    }
+    printf("[MQTT] 제어 토픽 재구독 완료: %s\n", TOPIC_CONTROL);
+    
+    // 2. 상태 토픽에 online 메시지 발행 (retain)
+    if (!mqtt_publish(mqtt, TOPIC_STATUS, "online", 0, 1)) {
+        printf("[오류] 상태 메시지 발행 실패: %s\n", TOPIC_STATUS);
+        return false;
+    }
+    printf("[MQTT] 상태 메시지 발행 완료: %s -> online\n", TOPIC_STATUS);
+    
+    printf("[MQTT] 재연결 후 초기화 완료\n");
+    return true;
+}
+
 int main(void) {
     // 표준 입출력 초기화
     stdio_init_all();
@@ -63,7 +95,8 @@ int main(void) {
         .password = MQTT_PASSWORD,
         .lwt_topic = LWT_TOPIC,
         .lwt_message = LWT_MESSAGE,
-        .connected = false
+        .connected = false,
+        .last_activity = 0
     };
     
     // MQTT 브로커 연결
@@ -72,13 +105,12 @@ int main(void) {
         return -1;
     }
     
-    // 제어 토픽 구독
-    mqtt_subscribe(mqtt, TOPIC_CONTROL, 0);
+    // MQTT 초기화 (구독 + 상태 발행)
+    if (!mqtt_reinitialize_after_reconnect(mqtt)) {
+        printf("[경고] MQTT 초기화 실패\n");
+    }
     
-    // Alive 메시지 발행
-    mqtt_publish(mqtt, TOPIC_STATUS, "online", 0, 1);
-    
-    printf("\n=== 메인 루프 시작 ===\n");
+    printf("\n=== 메인 루프 시작 ===");
     
     uint32_t last_sensor_time = 0;
     uint32_t last_alive_time = 0;
@@ -89,6 +121,9 @@ int main(void) {
         
         // 연결 상태 확인 (30초마다)
         if (now - last_connection_check > 30000) {
+            // MQTT keepalive 메시지 전송
+            mqtt_keepalive(mqtt);
+            
             if (!mqtt_is_connected(mqtt)) {
                 printf("[경고] MQTT 연결 끊김 감지\n");
                 
@@ -97,11 +132,15 @@ int main(void) {
                     printf("[경고] WiFi 연결 끊김 감지\n");
                     if (esp01_reconnect_wifi(esp01)) {
                         // WiFi 재연결 성공 후 MQTT 재연결
-                        mqtt_reconnect(mqtt);
+                        if (mqtt_reconnect(mqtt)) {
+                            mqtt_reinitialize_after_reconnect(mqtt);
+                        }
                     }
                 } else {
                     // WiFi는 연결됨, MQTT만 재연결
-                    mqtt_reconnect(mqtt);
+                    if (mqtt_reconnect(mqtt)) {
+                        mqtt_reinitialize_after_reconnect(mqtt);
+                    }
                 }
             }
             last_connection_check = now;

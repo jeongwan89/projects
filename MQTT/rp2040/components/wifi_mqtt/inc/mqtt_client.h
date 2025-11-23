@@ -2,6 +2,7 @@
 #define MQTT_CLIENT_H
 
 #include <stdbool.h>
+#include <cstdint>
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,7 @@ typedef struct {
     const char* lwt_topic;    // Last Will Topic
     const char* lwt_message;  // Last Will Message
     bool connected;           // 연결 상태
+    uint32_t last_activity;   // 마지막 MQTT 활동 시간 (ms)
 } MqttClient;
 
 // MQTT 브로커 연결
@@ -42,6 +44,9 @@ bool mqtt_check_connection(MqttClient& client);
 
 // MQTT 브로커 재연결 (기존 설정 사용)
 bool mqtt_reconnect(MqttClient& client);
+
+// MQTT keepalive (주기적으로 호출하여 연결 유지)
+void mqtt_keepalive(MqttClient& client);
 
 #ifdef __cplusplus
 }

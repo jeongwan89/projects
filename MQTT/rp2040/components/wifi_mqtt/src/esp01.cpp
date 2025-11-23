@@ -4,6 +4,7 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
+#include "hardware/watchdog.h"
 
 void esp01_module_init(Esp01Module& module) {
     printf("[ESP-01] 모듈 초기화 시작\n");
@@ -135,6 +136,9 @@ bool esp01_connect_wifi(Esp01Module& module) {
     }
     
     printf("[ESP-01] WiFi 연결 최종 실패\n");
+    // 완전 최종실패가 되었을 때, esp01 하드웨어 리셋
+    esp01_module_init(module);  // 모듈 재초기화
+
     return false;
 }
 
