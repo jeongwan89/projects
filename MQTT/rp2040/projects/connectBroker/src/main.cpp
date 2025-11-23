@@ -82,9 +82,30 @@ int main(void) {
     
     uint32_t last_sensor_time = 0;
     uint32_t last_alive_time = 0;
+    uint32_t last_connection_check = 0;
     
     while (true) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
+        
+        // 연결 상태 확인 (30초마다)
+        if (now - last_connection_check > 30000) {
+            if (!mqtt_is_connected(mqtt)) {
+                printf("[경고] MQTT 연결 끊김 감지\n");
+                
+                // WiFi 연결 확인
+                if (!esp01_is_connected(esp01)) {
+                    printf("[경고] WiFi 연결 끊김 감지\n");
+                    if (esp01_reconnect_wifi(esp01)) {
+                        // WiFi 재연결 성공 후 MQTT 재연결
+                        mqtt_reconnect(mqtt);
+                    }
+                } else {
+                    // WiFi는 연결됨, MQTT만 재연결
+                    mqtt_reconnect(mqtt);
+                }
+            }
+            last_connection_check = now;
+        }
         
         // 센서 데이터 발행 (10초마다)
         if (now - last_sensor_time > 10000) {
@@ -94,14 +115,22 @@ int main(void) {
             snprintf(data, sizeof(data), "{\"temp\":%.1f,\"humi\":%.1f}", temp, humi);
             
             printf("[발행] %s: %s\n", TOPIC_SENSOR, data);
-            mqtt_publish(mqtt, TOPIC_SENSOR, data, 0, 0);
+            if (!mqtt_publish(mqtt, TOPIC_SENSOR, data, 0, 0)) {
+                printf("[경고] 센서 데이터 발행 실패 - 연결 확인 중...\n");
+                // 즉시 연결 재확인
+                last_connection_check = 0;
+            }
             last_sensor_time = now;
         }
         
         // Alive 메시지 (60초마다)
         if (now - last_alive_time > 60000) {
             printf("[발행] %s: alive\n", TOPIC_STATUS);
-            mqtt_publish(mqtt, TOPIC_STATUS, "alive", 0, 0);
+            if (!mqtt_publish(mqtt, TOPIC_STATUS, "alive", 0, 0)) {
+                printf("[경고] Alive 메시지 발행 실패 - 연결 확인 중...\n");
+                // 즉시 연결 재확인
+                last_connection_check = 0;
+            }
             last_alive_time = now;
         }
         

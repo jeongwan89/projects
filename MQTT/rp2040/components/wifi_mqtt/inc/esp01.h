@@ -32,6 +32,9 @@ bool esp01_connect_wifi(Esp01Module& module);
 // WiFi 연결 상태 확인
 bool esp01_is_connected(Esp01Module& module);
 
+// WiFi 재연결 (기존 SSID/비밀번호 사용)
+bool esp01_reconnect_wifi(Esp01Module& module);
+
 #ifdef __cplusplus
 }
 #endif

@@ -37,6 +37,12 @@ bool mqtt_is_connected(MqttClient& client);
 // MQTT 연결 해제
 void mqtt_disconnect(MqttClient& client);
 
+// MQTT 브로커 연결 상태 확인 (AT 명령 사용)
+bool mqtt_check_connection(MqttClient& client);
+
+// MQTT 브로커 재연결 (기존 설정 사용)
+bool mqtt_reconnect(MqttClient& client);
+
 #ifdef __cplusplus
 }
 #endif

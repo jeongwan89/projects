@@ -166,3 +166,28 @@ bool esp01_is_connected(Esp01Module& module) {
     }
     return false;
 }
+
+bool esp01_reconnect_wifi(Esp01Module& module) {
+    printf("[ESP-01] WiFi 재연결 시도...\n");
+    
+    // NULL 포인터 검증
+    if (!module.uart) {
+        printf("[ESP-01] 오류: NULL UART 인스턴스\n");
+        return false;
+    }
+    
+    // 현재 WiFi 연결 끊기
+    uart_clear_rx_buffer();
+    uart_send_at_command("AT+CWQAP");
+    uart_wait_response("OK", 2000);
+    sleep_ms(1000);
+    
+    // WiFi 재연결 시도
+    if (esp01_connect_wifi(module)) {
+        printf("[ESP-01] WiFi 재연결 성공\n");
+        return true;
+    }
+    
+    printf("[ESP-01] WiFi 재연결 실패\n");
+    return false;
+}

@@ -210,7 +210,8 @@ bool mqtt_publish(MqttClient& client, const char* topic, const char* message, in
     
     // ">" 프롬프트 대기
     if (!uart_wait_response(">", 2000)) {
-        printf("[MQTT] 발행 준비 실패\n");
+        printf("[MQTT] 발행 준비 실패 (연결 끊김 가능성)\n");
+        client.connected = false;  // 연결 상태 플래그 업데이트
         return false;
     }
     
@@ -222,7 +223,8 @@ bool mqtt_publish(MqttClient& client, const char* topic, const char* message, in
     
     // 전송 완료 대기
     if (!uart_wait_response("OK", 3000)) {
-        printf("[MQTT] 발행 실패\n");
+        printf("[MQTT] 발행 실패 (연결 끊김 가능성)\n");
+        client.connected = false;  // 연결 상태 플래그 업데이트
         return false;
     }
     
@@ -362,6 +364,53 @@ bool mqtt_check_message(MqttClient& client, char* topic, int topic_max_len, char
 
 bool mqtt_is_connected(MqttClient& client) {
     return client.connected;
+}
+
+bool mqtt_check_connection(MqttClient& client) {
+    if (!client.connected) {
+        return false;
+    }
+    
+    // AT+MQTTCONN? 명령으로 실제 연결 상태 확인
+    uart_clear_rx_buffer();
+    sleep_ms(50);
+    uart_send_at_command("AT+MQTTCONN?");
+    
+    // +MQTTCONN:0,0,"","",1883,0 응답 대기 (0=연결됨, 1=연결끊김)
+    if (uart_wait_response("+MQTTCONN:", 2000)) {
+        const char* resp = uart_get_rx_buffer();
+        if (resp && strstr(resp, ",0,")) {
+            // 첫 번째 파라미터가 0이면 연결됨
+            return true;
+        }
+    }
+    
+    // 연결 상태 플래그 업데이트
+    client.connected = false;
+    return false;
+}
+
+bool mqtt_reconnect(MqttClient& client) {
+    printf("[MQTT] 재연결 시도...\n");
+    
+    // 기존 연결 정리
+    if (client.connected) {
+        mqtt_disconnect(client);
+        sleep_ms(1000);
+    }
+    
+    // 재연결 시도 (3회)
+    for (int i = 0; i < 3; i++) {
+        if (mqtt_connect(client)) {
+            printf("[MQTT] 재연결 성공\n");
+            return true;
+        }
+        printf("[MQTT] 재연결 실패 (시도 %d/3)\n", i + 1);
+        sleep_ms(2000);
+    }
+    
+    printf("[MQTT] 재연결 최종 실패\n");
+    return false;
 }
 
 void mqtt_disconnect(MqttClient& client) {
