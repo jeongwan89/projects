@@ -17,10 +17,28 @@
 #define ESP01_UART_BAUDRATE 115200
 #define ESP01_RST_PIN       3
 
-// TM1637 디스플레이 하드웨어 설정
-#define TM1637_CLK_PIN      10
-#define TM1637_DIO_PIN      11
+// TM1637 디스플레이 하드웨어 설정 (8개 병렬)
+// GH1_TEMP, GH1_HUM, GH2_TEMP, GH2_HUM, GH3_TEMP, GH3_HUM, GH4_TEMP, GH4_HUM
+#define NUM_DISPLAYS        8
 #define TM1637_BRIGHTNESS   7   // 0-7
+
+// 각 디스플레이 핀 설정 (CLK, DIO 쌍)
+#define TM1637_GH1_TEMP_CLK 6
+#define TM1637_GH1_TEMP_DIO 7
+#define TM1637_GH1_HUM_CLK  8
+#define TM1637_GH1_HUM_DIO  9
+#define TM1637_GH2_TEMP_CLK 10
+#define TM1637_GH2_TEMP_DIO 11
+#define TM1637_GH2_HUM_CLK  12
+#define TM1637_GH2_HUM_DIO  13
+#define TM1637_GH3_TEMP_CLK 14
+#define TM1637_GH3_TEMP_DIO 15
+#define TM1637_GH3_HUM_CLK  16
+#define TM1637_GH3_HUM_DIO  17
+#define TM1637_GH4_TEMP_CLK 18
+#define TM1637_GH4_TEMP_DIO 19
+#define TM1637_GH4_HUM_CLK  20
+#define TM1637_GH4_HUM_DIO  21
 
 // MQTT 브로커 설정
 #define MQTT_BROKER     "192.168.0.24"
@@ -45,21 +63,16 @@
 #define TOPIC_GH4_TEMP  "Sensor/GH4/Center/Temp"
 #define TOPIC_GH4_HUM   "Sensor/GH4/Center/Hum"
 
-// 디스플레이 모드 제어 토픽
-#define TOPIC_DISPLAY_MODE  "Display/TM1637/mode"
-
-// 디스플레이 모드 열거형
-enum DisplayMode {
-    MODE_GH1_TEMP = 0,
-    MODE_GH1_HUM,
-    MODE_GH2_TEMP,
-    MODE_GH2_HUM,
-    MODE_GH3_TEMP,
-    MODE_GH3_HUM,
-    MODE_GH4_TEMP,
-    MODE_GH4_HUM,
-    MODE_AUTO_ROTATE,  // 자동 순환 모드
-    MODE_COUNT
+// 디스플레이 인덱스
+enum DisplayIndex {
+    DISPLAY_GH1_TEMP = 0,
+    DISPLAY_GH1_HUM,
+    DISPLAY_GH2_TEMP,
+    DISPLAY_GH2_HUM,
+    DISPLAY_GH3_TEMP,
+    DISPLAY_GH3_HUM,
+    DISPLAY_GH4_TEMP,
+    DISPLAY_GH4_HUM
 };
 
 #endif // CONFIG_H

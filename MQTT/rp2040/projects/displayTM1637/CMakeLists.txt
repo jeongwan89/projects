@@ -9,6 +9,9 @@ project(rp2040_display_tm1637 C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# compile_commands.json 생성
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Pico SDK 초기화
 pico_sdk_init()
 
