@@ -12,8 +12,8 @@
 #include "main.h"
 
 // 전역 변수 정의
-TM1637Display displays[NUM_DISPLAYS];
-DisplayData display_data[NUM_DISPLAYS] = {0};
+TM1637Display* displays[NUM_DISPLAYS];
+DisplayData display_data[NUM_DISPLAYS] = {{0.0f, false}};
 
 int main(void) {
     // 표준 입출력 초기화
@@ -49,16 +49,14 @@ int main(void) {
     };
     
     for (int i = 0; i < NUM_DISPLAYS; i++) {
-        displays[i].clk_pin = display_pins[i][0];
-        displays[i].dio_pin = display_pins[i][1];
-        displays[i].brightness = TM1637_BRIGHTNESS;
-        displays[i].display_on = true;
+        displays[i] = new TM1637Display(display_pins[i][0], display_pins[i][1]);
         
-        if (!tm1637_init(displays[i])) {
+        if (!displays[i]->init()) {
             printf("[오류] %s 디스플레이 초기화 실패 (CLK=%d, DIO=%d)\n", 
                    display_names[i], display_pins[i][0], display_pins[i][1]);
             return -1;
         }
+        displays[i]->setBrightness(TM1637_BRIGHTNESS);
         printf("[OK] %s 디스플레이 초기화 완료 (CLK=%d, DIO=%d)\n", 
                display_names[i], display_pins[i][0], display_pins[i][1]);
     }
@@ -66,11 +64,11 @@ int main(void) {
     // 초기 테스트 표시 (모든 디스플레이에 8888)
     printf("\n디스플레이 테스트 중...\n");
     for (int i = 0; i < NUM_DISPLAYS; i++) {
-        tm1637_show_number(displays[i], 8888, true);
+        displays[i]->showNumber(8888, true);
     }
     sleep_ms(1000);
     for (int i = 0; i < NUM_DISPLAYS; i++) {
-        tm1637_clear(displays[i]);
+        displays[i]->clear();
     }
     printf("디스플레이 테스트 완료\n\n");
     

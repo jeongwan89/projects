@@ -9,10 +9,6 @@
 #include "tm1637.h"
 #include "config.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * @brief 센서 데이터 저장 구조체 (8개 디스플레이용)
  */
@@ -22,7 +18,7 @@ typedef struct {
 } DisplayData;
 
 // 전역 변수 선언
-extern TM1637Display displays[NUM_DISPLAYS];
+extern TM1637Display* displays[NUM_DISPLAYS];
 extern DisplayData display_data[NUM_DISPLAYS];
 
 /**
@@ -36,7 +32,7 @@ extern DisplayData display_data[NUM_DISPLAYS];
  * @return true 모든 초기화 작업 성공
  * @return false 초기화 작업 중 하나라도 실패
  */
-static inline bool mqtt_reinitialize_after_reconnect(MqttClient& mqtt) {
+inline bool mqtt_reinitialize_after_reconnect(MqttClient& mqtt) {
     printf("[MQTT] 재연결 후 초기화 시작...\n");
     
     // 상태 토픽에 online 메시지 발행 (retain)
@@ -71,7 +67,7 @@ static inline bool mqtt_reinitialize_after_reconnect(MqttClient& mqtt) {
  * @param message MQTT 메시지 문자열
  * @return float 파싱된 실수 값
  */
-static inline float parse_float_from_message(const char* message) {
+inline float parse_float_from_message(const char* message) {
     return atof(message);
 }
 
@@ -83,7 +79,7 @@ static inline float parse_float_from_message(const char* message) {
  * @param topic MQTT 토픽
  * @param message MQTT 메시지
  */
-static inline void process_mqtt_message(const char* topic, const char* message) {
+inline void process_mqtt_message(const char* topic, const char* message) {
     printf("[수신] %s: %s\n", topic, message);
     
     float value = parse_float_from_message(message);
@@ -131,24 +127,20 @@ static inline void process_mqtt_message(const char* topic, const char* message) 
  * - 홀수 인덱스: 습도 표시
  * - 데이터 없을 때: 화면 지우기
  */
-static inline void update_all_displays() {
+inline void update_all_displays() {
     for (int i = 0; i < NUM_DISPLAYS; i++) {
         if (display_data[i].valid) {
             // 짝수 인덱스 = 온도, 홀수 인덱스 = 습도
             if (i % 2 == 0) {
-                tm1637_show_temperature(displays[i], display_data[i].value);
+                displays[i]->showTemperature(display_data[i].value);
             } else {
-                tm1637_show_humidity(displays[i], display_data[i].value);
+                displays[i]->showHumidity(display_data[i].value);
             }
         } else {
             // 데이터 없을 때 화면 지우기
-            tm1637_clear(displays[i]);
+            displays[i]->clear();
         }
     }
 }
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // MAIN_H
