@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cstdlib>
 #include "pico/stdlib.h"
+#include "pico/unique_id.h"  // RP2040 고유 ID
 #include "hardware/uart.h"
 #include "uart_comm.h"
 #include "esp01.h"
@@ -14,6 +15,23 @@
 // 전역 변수 정의
 TM1637Display* displays[NUM_DISPLAYS];
 DisplayData display_data[NUM_DISPLAYS] = {{0.0f, false}};
+
+/**
+ * @brief RP2040 고유 ID를 사용해 고유한 MQTT Client ID 생성
+ * 
+ * @param buffer Client ID를 저장할 버퍼
+ * @param buffer_size 버퍼 크기
+ */
+void generate_unique_client_id(char* buffer, size_t buffer_size) {
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+    
+    // 마지막 4바이트를 16진수로 변환 (8자리)
+    snprintf(buffer, buffer_size, "%s%02X%02X%02X%02X",
+             MQTT_CLIENT_ID_PREFIX,
+             board_id.id[4], board_id.id[5], 
+             board_id.id[6], board_id.id[7]);
+}
 
 int main(void) {
     // 표준 입출력 초기화
@@ -104,11 +122,16 @@ int main(void) {
     
     sleep_ms(2000);
     
+    // 고유한 MQTT Client ID 생성
+    char mqtt_client_id[64];
+    generate_unique_client_id(mqtt_client_id, sizeof(mqtt_client_id));
+    printf("생성된 Client ID: %s\n", mqtt_client_id);
+    
     // MQTT 클라이언트 설정
     MqttClient mqtt = {
         .broker = MQTT_BROKER,
         .port = MQTT_PORT,
-        .client_id = MQTT_CLIENT_ID,
+        .client_id = mqtt_client_id,  // 동적 생성된 고유 ID
         .username = MQTT_USERNAME,
         .password = MQTT_PASSWORD,
         .lwt_topic = LWT_TOPIC,

@@ -25,25 +25,26 @@
 // 각 디스플레이 핀 설정 (CLK, DIO 쌍)
 #define TM1637_GH1_TEMP_CLK 6
 #define TM1637_GH1_TEMP_DIO 7
-#define TM1637_GH1_HUM_CLK  8
-#define TM1637_GH1_HUM_DIO  9
-#define TM1637_GH2_TEMP_CLK 10
-#define TM1637_GH2_TEMP_DIO 11
-#define TM1637_GH2_HUM_CLK  12
-#define TM1637_GH2_HUM_DIO  13
-#define TM1637_GH3_TEMP_CLK 14
-#define TM1637_GH3_TEMP_DIO 15
+#define TM1637_GH1_HUM_CLK  20
+#define TM1637_GH1_HUM_DIO  21
+#define TM1637_GH2_TEMP_CLK 8
+#define TM1637_GH2_TEMP_DIO 9
+#define TM1637_GH2_HUM_CLK  18
+#define TM1637_GH2_HUM_DIO  19
+#define TM1637_GH3_TEMP_CLK 10
+#define TM1637_GH3_TEMP_DIO 11
 #define TM1637_GH3_HUM_CLK  16
 #define TM1637_GH3_HUM_DIO  17
-#define TM1637_GH4_TEMP_CLK 18
-#define TM1637_GH4_TEMP_DIO 19
-#define TM1637_GH4_HUM_CLK  20
-#define TM1637_GH4_HUM_DIO  21
+#define TM1637_GH4_TEMP_CLK 12
+#define TM1637_GH4_TEMP_DIO 13
+#define TM1637_GH4_HUM_CLK  14
+#define TM1637_GH4_HUM_DIO  15
 
 // MQTT 브로커 설정
 #define MQTT_BROKER     "192.168.0.24"
 #define MQTT_PORT       1883
-#define MQTT_CLIENT_ID  "rp2040_display_tm1637_001"
+// Client ID는 main.cpp에서 RP2040 고유 ID를 사용해 동적 생성
+#define MQTT_CLIENT_ID_PREFIX  "rp2040_display_"  // 고유 ID가 뒤에 붙음
 #define MQTT_USERNAME   "farmmain"
 #define MQTT_PASSWORD   "eerrtt"
 
