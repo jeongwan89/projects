@@ -1,8 +1,10 @@
+// File: /home/kjw/Git/projects/MQTT/rp2040/projects/displayTM1637/src/main.cpp
+// RP2040 MQTT TM1637 Display - Main Entry Point
 #include <stdio.h>
 #include <cstring>
 #include <cstdlib>
 #include "pico/stdlib.h"
-#include "pico/unique_id.h"  // RP2040 고유 ID
+#include "pico/unique_id.h" // RP2040 고유 ID
 #include "hardware/uart.h"
 #include "uart_comm.h"
 #include "esp01.h"
@@ -13,83 +15,109 @@
 #include "main.h"
 
 // 전역 변수 정의
-TM1637Display* displays[NUM_DISPLAYS];
-DisplayData display_data[NUM_DISPLAYS] = {{0.0f, false}};
+TM1637Display *displays[NUM_DISPLAYS];
+DisplayData display_data[NUM_DISPLAYS] = {{0.0f, 0.0f, false}};
+
+// 토픽-디스플레이 매핑 테이블 (동적 처리용)
+const TopicMapping topic_map[NUM_DISPLAYS] = {
+    {TOPIC_GH1_TEMP, DISPLAY_GH1_TEMP},
+    {TOPIC_GH1_HUM, DISPLAY_GH1_HUM},
+    {TOPIC_GH2_TEMP, DISPLAY_GH2_TEMP},
+    {TOPIC_GH2_HUM, DISPLAY_GH2_HUM},
+    {TOPIC_GH3_TEMP, DISPLAY_GH3_TEMP},
+    {TOPIC_GH3_HUM, DISPLAY_GH3_HUM},
+    {TOPIC_GH4_TEMP, DISPLAY_GH4_TEMP},
+    {TOPIC_GH4_HUM, DISPLAY_GH4_HUM}};
 
 /**
  * @brief RP2040 고유 ID를 사용해 고유한 MQTT Client ID 생성
- * 
+ *
  * @param buffer Client ID를 저장할 버퍼
  * @param buffer_size 버퍼 크기
  */
-void generate_unique_client_id(char* buffer, size_t buffer_size) {
+void generate_unique_client_id(char *buffer, size_t buffer_size)
+{
     pico_unique_board_id_t board_id;
     pico_get_unique_board_id(&board_id);
-    
+
     // 마지막 4바이트를 16진수로 변환 (8자리)
     snprintf(buffer, buffer_size, "%s%02X%02X%02X%02X",
              MQTT_CLIENT_ID_PREFIX,
-             board_id.id[4], board_id.id[5], 
+             board_id.id[4], board_id.id[5],
              board_id.id[6], board_id.id[7]);
 }
 
-int main(void) {
+int main(void)
+{
     // 표준 입출력 초기화
     stdio_init_all();
-    
+
     // USB CDC 연결 대기 (최대 5초)
     uint32_t start = to_ms_since_boot(get_absolute_time());
-    while (!stdio_usb_connected() && (to_ms_since_boot(get_absolute_time()) - start < 5000)) {
+    while (!stdio_usb_connected() && (to_ms_since_boot(get_absolute_time()) - start < 5000))
+    {
         sleep_ms(100);
     }
     sleep_ms(500);
-    
+
     printf("\n\n=== RP2040 TM1637 디스플레이 ===\n");
     printf("8개 디스플레이 - 온실 4개 (온도/습도)\n\n");
-    
+
     // 8개 TM1637 디스플레이 초기화
     const uint8_t display_pins[NUM_DISPLAYS][2] = {
         {TM1637_GH1_TEMP_CLK, TM1637_GH1_TEMP_DIO}, // GH1 온도
-        {TM1637_GH1_HUM_CLK,  TM1637_GH1_HUM_DIO},  // GH1 습도
+        {TM1637_GH1_HUM_CLK, TM1637_GH1_HUM_DIO},   // GH1 습도
         {TM1637_GH2_TEMP_CLK, TM1637_GH2_TEMP_DIO}, // GH2 온도
-        {TM1637_GH2_HUM_CLK,  TM1637_GH2_HUM_DIO},  // GH2 습도
+        {TM1637_GH2_HUM_CLK, TM1637_GH2_HUM_DIO},   // GH2 습도
         {TM1637_GH3_TEMP_CLK, TM1637_GH3_TEMP_DIO}, // GH3 온도
-        {TM1637_GH3_HUM_CLK,  TM1637_GH3_HUM_DIO},  // GH3 습도
+        {TM1637_GH3_HUM_CLK, TM1637_GH3_HUM_DIO},   // GH3 습도
         {TM1637_GH4_TEMP_CLK, TM1637_GH4_TEMP_DIO}, // GH4 온도
-        {TM1637_GH4_HUM_CLK,  TM1637_GH4_HUM_DIO}   // GH4 습도
+        {TM1637_GH4_HUM_CLK, TM1637_GH4_HUM_DIO}    // GH4 습도
     };
-    
-    const char* display_names[NUM_DISPLAYS] = {
+
+    const char *display_names[NUM_DISPLAYS] = {
         "GH1 온도", "GH1 습도",
         "GH2 온도", "GH2 습도",
         "GH3 온도", "GH3 습도",
-        "GH4 온도", "GH4 습도"
-    };
-    
-    for (int i = 0; i < NUM_DISPLAYS; i++) {
+        "GH4 온도", "GH4 습도"};
+
+    for (int i = 0; i < NUM_DISPLAYS; i++)
+    {
         displays[i] = new TM1637Display(display_pins[i][0], display_pins[i][1]);
-        
-        if (!displays[i]->init()) {
-            printf("[오류] %s 디스플레이 초기화 실패 (CLK=%d, DIO=%d)\n", 
+
+        if (!displays[i]->init())
+        {
+            printf("[오류] %s 디스플레이 초기화 실패 (CLK=%d, DIO=%d)\n",
                    display_names[i], display_pins[i][0], display_pins[i][1]);
+            // 이전 할당된 디스플레이 메모리 정리
+            for (int j = 0; j < i; j++)
+            {
+                if (displays[j] != nullptr)
+                {
+                    delete displays[j];
+                    displays[j] = nullptr;
+                }
+            }
             return -1;
         }
         displays[i]->setBrightness(TM1637_BRIGHTNESS);
-        printf("[OK] %s 디스플레이 초기화 완료 (CLK=%d, DIO=%d)\n", 
+        printf("[OK] %s 디스플레이 초기화 완료 (CLK=%d, DIO=%d)\n",
                display_names[i], display_pins[i][0], display_pins[i][1]);
     }
-    
+
     // 초기 테스트 표시 (모든 디스플레이에 8888)
     printf("\n디스플레이 테스트 중...\n");
-    for (int i = 0; i < NUM_DISPLAYS; i++) {
+    for (int i = 0; i < NUM_DISPLAYS; i++)
+    {
         displays[i]->showNumber(8888, true);
     }
     sleep_ms(1000);
-    for (int i = 0; i < NUM_DISPLAYS; i++) {
+    for (int i = 0; i < NUM_DISPLAYS; i++)
+    {
         displays[i]->clear();
     }
     printf("디스플레이 테스트 완료\n\n");
-    
+
     // ESP-01 모듈 설정
     Esp01Module esp01 = {
         .uart = ESP01_UART,
@@ -98,104 +126,123 @@ int main(void) {
         .uart_baudrate = ESP01_UART_BAUDRATE,
         .rst_pin = ESP01_RST_PIN,
         .ssid = WIFI_SSID,
-        .password = WIFI_PASSWORD
-    };
-    
+        .password = WIFI_PASSWORD};
+
     // ESP-01 모듈 초기화
+    printf("[정보] ESP-01 모듈 초기화 중...\n");
     esp01_module_init(esp01);
-    
+
     // ESP-01 AT 명령 초기화
-    if (!esp01_at_init(esp01)) {
+    if (!esp01_at_init(esp01))
+    {
         printf("[오류] ESP-01 AT 초기화 실패\n");
         printf("시리얼 브리지 모드로 전환합니다...\n");
+        cleanup_resources();
         serial_bridge_mode(uart1);
         return -1;
     }
-    
+
     // WiFi 연결
-    if (!esp01_connect_wifi(esp01)) {
+    if (!esp01_connect_wifi(esp01))
+    {
         printf("[오류] WiFi 연결 실패\n");
         printf("시리얼 브리지 모드로 전환합니다...\n");
+        cleanup_resources();
         serial_bridge_mode(uart1);
         return -1;
     }
-    
+
     sleep_ms(2000);
-    
+
     // 고유한 MQTT Client ID 생성
     char mqtt_client_id[64];
     generate_unique_client_id(mqtt_client_id, sizeof(mqtt_client_id));
     printf("생성된 Client ID: %s\n", mqtt_client_id);
-    
+
     // MQTT 클라이언트 설정
     MqttClient mqtt = {
         .broker = MQTT_BROKER,
         .port = MQTT_PORT,
-        .client_id = mqtt_client_id,  // 동적 생성된 고유 ID
+        .client_id = mqtt_client_id, // 동적 생성된 고유 ID
         .username = MQTT_USERNAME,
         .password = MQTT_PASSWORD,
         .lwt_topic = LWT_TOPIC,
         .lwt_message = LWT_MESSAGE,
         .connected = false,
-        .last_activity = 0
-    };
-    
+        .last_activity = 0};
+
     // MQTT 브로커 연결
-    if (!mqtt_connect(mqtt)) {
+    if (!mqtt_connect(mqtt))
+    {
         printf("[오류] MQTT 연결 실패\n");
+        cleanup_resources();
         return -1;
     }
-    
+
     // MQTT 초기화 (구독 + 상태 발행)
-    if (!mqtt_reinitialize_after_reconnect(mqtt)) {
+    if (!mqtt_reinitialize_after_reconnect(mqtt))
+    {
         printf("[경고] MQTT 초기화 실패\n");
     }
-    
+
     printf("\n=== 메인 루프 시작 ===\n");
-    
+
     uint32_t last_connection_check = 0;
     uint32_t last_display_update = 0;
-    
-    while (true) {
+
+    while (true)
+    {
         uint32_t now = to_ms_since_boot(get_absolute_time());
-        
-        // 연결 상태 확인 (30초마다)
-        if (now - last_connection_check > 30000) {
+
+        // 연결 상태 확인 (CONNECTION_CHECK_MS마다 - 더 빠른 재연결)
+        if (now - last_connection_check > CONNECTION_CHECK_MS)
+        {
             mqtt_keepalive(mqtt);
-            
-            if (!mqtt_is_connected(mqtt)) {
-                printf("[경고] MQTT 연결 끊김 감지\n");
-                
-                if (!esp01_is_connected(esp01)) {
+
+            if (!mqtt_is_connected(mqtt))
+            {
+                printf("[경고] MQTT 연결 끊김 감지 (타임스탬프: %lu)\n", now);
+
+                if (!esp01_is_connected(esp01))
+                {
                     printf("[경고] WiFi 연결 끊김 감지\n");
-                    if (esp01_reconnect_wifi(esp01)) {
-                        if (mqtt_reconnect(mqtt)) {
+                    if (esp01_reconnect_wifi(esp01))
+                    {
+                        if (mqtt_reconnect(mqtt))
+                        {
                             mqtt_reinitialize_after_reconnect(mqtt);
                         }
                     }
-                } else {
-                    if (mqtt_reconnect(mqtt)) {
+                }
+                else
+                {
+                    if (mqtt_reconnect(mqtt))
+                    {
                         mqtt_reinitialize_after_reconnect(mqtt);
                     }
                 }
             }
             last_connection_check = now;
         }
-        
+
         // MQTT 메시지 수신 확인
-        char topic[64], message[128];
-        if (mqtt_check_message(mqtt, topic, sizeof(topic), message, sizeof(message))) {
+        char topic[MQTT_TOPIC_MAX_LEN], message[MQTT_MESSAGE_MAX_LEN];
+        if (mqtt_check_message(mqtt, topic, sizeof(topic), message, sizeof(message)))
+        {
             process_mqtt_message(topic, message);
         }
-        
-        // 모든 디스플레이 업데이트 (1초마다)
-        if (now - last_display_update > 1000) {
+
+        // 모든 디스플레이 업데이트 (DISPLAY_UPDATE_MS마다)
+        if (now - last_display_update > DISPLAY_UPDATE_MS)
+        {
             update_all_displays();
             last_display_update = now;
         }
-        
+
         sleep_ms(50);
     }
-    
+
+    // 도달하지 않지만, 종료 시 정리 코드
+    cleanup_resources();
     return 0;
 }
