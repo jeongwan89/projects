@@ -36,6 +36,7 @@ target_link_libraries(${PROJECT_NAME}
     pico_stdlib
     hardware_uart
     hardware_gpio
+    hardware_watchdog
     wifi_mqtt
     tm1637
 )

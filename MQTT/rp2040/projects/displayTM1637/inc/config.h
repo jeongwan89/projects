@@ -51,6 +51,10 @@
 // 연결 재확인 간격 (밀리초)
 #define CONNECTION_CHECK_MS 5000 // 5초마다 연결 상태 확인
 #define DISPLAY_UPDATE_MS 1000   // 1초마다 디스플레이 업데이트
+#define HEALTH_CHECK_MS 10000    // 10초마다 시스템 건강 체크
+
+// Watchdog Timer 설정 (밀리초)
+#define WATCHDOG_TIMEOUT_MS 30000 // 30초 WDT (타임아웃 시 자동 재부팅)
 
 // 센서 값 범위 검증 (온도/습도)
 #define SENSOR_VALUE_MIN -99.9f

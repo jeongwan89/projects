@@ -4,7 +4,8 @@
 #include <cstring>
 #include <cstdlib>
 #include "pico/stdlib.h"
-#include "pico/unique_id.h" // RP2040 고유 ID
+#include "pico/unique_id.h"    // RP2040 고유 ID
+#include "hardware/watchdog.h" // Watchdog Timer
 #include "hardware/uart.h"
 #include "uart_comm.h"
 #include "esp01.h"
@@ -52,11 +53,22 @@ int main(void)
     // 표준 입출력 초기화
     stdio_init_all();
 
+    // Watchdog Timer 초기화 (30초 타임아웃)
+    // 주기적으로 watchdog_update()를 호출해야 타임아웃 방지
+    if (watchdog_hw->ctrl != 0)
+    {
+        // 이미 활성화된 경우 (예: 이전 재부팅)
+        printf("[경고] Watchdog이 이미 활성화되어 있습니다 (이전 타임아웃)\n");
+    }
+    watchdog_enable(WATCHDOG_TIMEOUT_MS, 1); // 1=패닉 시 리셋
+    printf("[OK] Watchdog Timer 활성화 (타임아웃: %dms)\n", WATCHDOG_TIMEOUT_MS);
+
     // USB CDC 연결 대기 (최대 5초)
     uint32_t start = to_ms_since_boot(get_absolute_time());
     while (!stdio_usb_connected() && (to_ms_since_boot(get_absolute_time()) - start < 5000))
     {
         sleep_ms(100);
+        watchdog_update(); // WDT 갱신
     }
     sleep_ms(500);
 
@@ -83,7 +95,24 @@ int main(void)
 
     for (int i = 0; i < NUM_DISPLAYS; i++)
     {
+        watchdog_update(); // WDT 갱신 (시간 소모 작업)
+
         displays[i] = new TM1637Display(display_pins[i][0], display_pins[i][1]);
+
+        if (displays[i] == nullptr)
+        {
+            printf("[긴급] 디스플레이 %d 메모리 할당 실패 (out of memory)\n", i);
+            // 이미 할당된 디스플레이 정리
+            for (int j = 0; j < i; j++)
+            {
+                if (displays[j] != nullptr)
+                {
+                    delete displays[j];
+                    displays[j] = nullptr;
+                }
+            }
+            emergency_shutdown("Display memory allocation failed", -2);
+        }
 
         if (!displays[i]->init())
         {
@@ -98,7 +127,7 @@ int main(void)
                     displays[j] = nullptr;
                 }
             }
-            return -1;
+            emergency_shutdown("Display initialization failed", -3);
         }
         displays[i]->setBrightness(TM1637_BRIGHTNESS);
         printf("[OK] %s 디스플레이 초기화 완료 (CLK=%d, DIO=%d)\n",
@@ -110,6 +139,7 @@ int main(void)
     for (int i = 0; i < NUM_DISPLAYS; i++)
     {
         displays[i]->showNumber(8888, true);
+        watchdog_update(); // WDT 갱신
     }
     sleep_ms(1000);
     for (int i = 0; i < NUM_DISPLAYS; i++)
@@ -189,15 +219,27 @@ int main(void)
 
     uint32_t last_connection_check = 0;
     uint32_t last_display_update = 0;
+    uint32_t last_health_check = 0;
 
     while (true)
     {
         uint32_t now = to_ms_since_boot(get_absolute_time());
 
+        // 시스템 건강 체크 (HEALTH_CHECK_MS마다)
+        if (now - last_health_check > HEALTH_CHECK_MS)
+        {
+            if (!system_health_check())
+            {
+                emergency_shutdown("System health check failed", -1);
+            }
+            last_health_check = now;
+        }
+
         // 연결 상태 확인 (CONNECTION_CHECK_MS마다 - 더 빠른 재연결)
         if (now - last_connection_check > CONNECTION_CHECK_MS)
         {
             mqtt_keepalive(mqtt);
+            watchdog_update(); // WDT 갱신
 
             if (!mqtt_is_connected(mqtt))
             {
