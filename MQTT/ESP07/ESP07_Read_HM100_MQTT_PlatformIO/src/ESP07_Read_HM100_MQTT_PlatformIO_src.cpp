@@ -49,12 +49,12 @@ void onConnectionEstablished()
 
 void blink(int noRepeat)
 {
-    digitalWrite(LED_BUILTIN, HIGH);
+    digitalWrite(LED_PIN, HIGH);
     for(int i = 0 ; i < noRepeat; i++)
     {
-        digitalWrite(LED_BUILTIN, LOW);
+        digitalWrite(LED_PIN, LOW);
         delay(50);
-        digitalWrite(LED_BUILTIN, HIGH);
+        digitalWrite(LED_PIN, HIGH);
         delay(50);
     }
 }
@@ -63,6 +63,10 @@ void DemandData(void)
 {
     char mP[7];
     CHIP485_SEL_TX;
+
+#if DEBUG_RS485
+    Serial.println("RS485: TX start");
+#endif
 
     // 이후에 SoftwareSerial rs485에 byte requestData 써 넣는 루틴
     // rs485.write(requestData,8);
@@ -80,7 +84,14 @@ void DemandData(void)
     }
     Serial.println();
 
+    rs485.flush();
+    delay(3); // RS485 TX->RX turn-around guard
+
     CHIP485_SEL_RX;
+
+#if DEBUG_RS485
+    Serial.println("RS485: TX done, RX enabled");
+#endif
 }
 
 
@@ -89,6 +100,13 @@ int ReadData(void)
     int index = 0;
     char mP[7];
     CHIP485_SEL_RX;
+
+    rs485.listen();
+
+#if DEBUG_RS485
+    Serial.print("RS485: available before read = ");
+    Serial.println(rs485.available());
+#endif
 
     index = rs485.available();
     if (index > 0)
@@ -115,6 +133,11 @@ int ReadData(void)
         //만약 읽기가 성공이면 blink 1번하기
         blink(1);
     }
+#if DEBUG_RS485
+    else {
+        Serial.println("RS485: no data received");
+    }
+#endif
     CHIP485_SEL_RX;
     return index;
 }
@@ -182,6 +205,9 @@ void Parsing(void)
 
 void read485InClass(void)
 {
+#if DEBUG_RS485
+    Serial.println("RS485: cycle start");
+#endif
     DemandData();
     delay(RS485_RESPONSE_WAIT_MS);
     
@@ -193,18 +219,28 @@ void read485InClass(void)
         Serial.print(MODBUS_RESPONSE_SIZE);
         Serial.print(" bytes, but received ");
         Serial.println(receivedBytes);
+#if DEBUG_RS485
+        Serial.println("RS485: response length mismatch");
+#endif
         return;
     }
     
     // CRC 검증
     if(!verifyCRC(Data, receivedBytes)) {
         Serial.println("Error: CRC verification failed!");
+#if DEBUG_RS485
+        Serial.println("RS485: CRC failed");
+#endif
         return;
     }
     
     Parsing();
     delay(RS485_RESPONSE_WAIT_MS);
     publishValue();
+
+#if DEBUG_RS485
+    Serial.println("RS485: cycle end");
+#endif
 }
 
 int publishValue(void)

@@ -23,7 +23,7 @@
   #define구문의 정의는 Esp07_HM100_MQTT_01 ~ xx (100개)로 하고 각 define의 인자를 정의하는 것으로 한다.
 */
 
-#define Esp07_HM100_MQTT_04
+#define Esp07_HM100_MQTT_03
 
 #ifdef Esp07_HM100_MQTT_01
 #define CLIENT_NAME "Green_House_HM100_Monitor_PCB_01"
@@ -85,6 +85,7 @@
 #define SSerialTxControl 16
 #define RS485RX 13  // PCB 설계 단계에서 선이 꼬여서 핀 번호를 바꿨음
 #define RS485TX 12
+#define LED_PIN 2 // ESP-12 built-in LED is on GPIO2
 
 // 함수 정의
 #define CHIP485_SEL_TX digitalWrite(SSerialTxControl, HIGH) // Transmission 485에서 외부로 전송
@@ -93,7 +94,7 @@
 // 상수 정의
 #define REFRESH_TIME 10 // sec(초단위) REFRESH_TIME 마다 온도/습도를 읽어서 MQTT에 올리기 위한 인터벌 시간
 #define READ_INTERVAL_MS 5000 // RS485 읽기 간격 (밀리초)
-#define RS485_RESPONSE_WAIT_MS 100 // RS485 응답 대기 시간 (밀리초)
+#define RS485_RESPONSE_WAIT_MS 200 // RS485 응답 대기 시간 (밀리초)
 #define DATA_BUFFER_SIZE 16 // 수신 데이터 버퍼 크기
 #define MODBUS_REQUEST_SIZE 8 // Modbus 요청 데이터 크기
 #define MODBUS_RESPONSE_SIZE 15 // 예상되는 Modbus 응답 크기
@@ -101,6 +102,8 @@
 #define PH_SCALE_FACTOR 100.0f // pH 값 스케일 팩터
 #define TEMP_SCALE_FACTOR 10.0f // 온도 값 스케일 팩터
 #define WORD_HIGH_BYTE_SHIFT 256 // 워드 값 상위 바이트 시프트
+#define ENABLE_LED_DIAG 1 // 부팅 시 LED 진단 패턴 실행
+#define DEBUG_RS485 1 // RS485 디버그 로그 활성화
 
 // 
 extern EspMQTTClient client;
@@ -134,7 +137,7 @@ void Parsing(void);
 // RaiseTimeEventInLoop에 사용할 함수
 void read485InClass(void);
 
-// LED_BUILTIN(#2)에 깜빡이는 신호
+// ESP-12 built-in LED(GPIO2)에 깜빡이는 신호
 // 인수 : 0.1sec 인터벌로 깜빡임 LOW는 점등, HIGH는 꺼짐
 void blink(int);
 

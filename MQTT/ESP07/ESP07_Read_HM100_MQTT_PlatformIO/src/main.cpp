@@ -38,13 +38,19 @@ RaiseTimeEventInLoop read485;
 
 void setup()
 {
-    pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(LED_PIN, OUTPUT);
     pinMode(SSerialTxControl, OUTPUT);
 
     Serial.begin(115200);
     rs485.begin(19200);
 
     blink(2);
+
+#if ENABLE_LED_DIAG
+    Serial.println("LED diagnostic: 5 blinks");
+    blink(5);
+#endif
+
     CHIP485_SEL_RX;
 
     // Optional functionalities of EspMQTTClient
