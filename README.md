@@ -54,6 +54,7 @@ LED를 깜빡이는 기본 예제 프로젝트입니다.
 - **STM32**: STM32CubeIDE, HAL 라이브러리
 - **Arduino**: Arduino IDE, AVR/ARM 기반 보드
 - **ESP32**: ESP-IDF, Arduino Framework
+- **RP2040**: Pico SDK (CMake), Raspberry Pi Pico / Pico W
 
 ### 기여 방법
 

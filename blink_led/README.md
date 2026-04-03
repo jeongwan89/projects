@@ -8,7 +8,8 @@
 blink_led/
 ├── stm32/          # STM32 마이크로컨트롤러용 코드
 ├── arduino/        # Arduino 보드용 코드
-└── esp32/          # ESP32 마이크로컨트롤러용 코드
+├── esp32/          # ESP32 마이크로컨트롤러용 코드
+└── rp2040/         # Raspberry Pi RP2040 (Pico)용 코드
 ```
 
 ## 지원 MCU
@@ -25,6 +26,11 @@ blink_led/
 ### ESP32
 - ESP32-WROOM-32
 - ESP-IDF 또는 Arduino 프레임워크 사용
+
+### RP2040
+- Raspberry Pi Pico / Pico W
+- Pico SDK (CMake) 사용
+- ⚠️ 여러 번 플래시 후 마운트 안 될 때 → [README 참조](rp2040/README.md#️-rp2040이-마운트되지-않을-때-bootsel-모드-진입-방법)
 
 ## 빌드 및 실행
 
