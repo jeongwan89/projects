@@ -1,5 +1,5 @@
 /**
- * @file main.c
+ * @file main.cpp
  * @brief ESP32 Blink LED 예제 (ESP-IDF)
  * @author jeongwan89
  * @date 2025

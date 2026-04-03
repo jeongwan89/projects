@@ -1,5 +1,5 @@
 /**
- * @file main.c
+ * @file main.cpp
  * @brief STM32 Blink LED 예제
  * @author jeongwan89
  * @date 2025
