@@ -1,0 +1,36 @@
+# Build artifacts
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+
+# IDE specific files
+.vscode/
+.idea/
+*.ioc
+*.swp
+*.swo
+*~
+
+# STM32 specific
+Debug/
+Release/
+*.launch
+
+# Arduino specific
+*.ino.eep
+*.ino.elf
+*.ino.hex
+*.ino.with_bootloader.bin
+
+# ESP-IDF specific
+build/
+sdkconfig
+sdkconfig.old
+*.pyc
+__pycache__/
+
+# OS specific
+.DS_Store
+Thumbs.db

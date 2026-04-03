@@ -1,0 +1,28 @@
+# Build output
+build/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Compiled binaries
+*.elf
+*.uf2
+*.bin
+*.hex
+*.dis
+*.map
+
+# IDE / Editor
+.vscode/*
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
