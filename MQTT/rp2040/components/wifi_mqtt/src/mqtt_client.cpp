@@ -146,8 +146,9 @@ bool mqtt_subscribe(MqttClient& client, const char* topic, int qos) {
     }
     
     // 재시도 로직 (최대 3회)
+    // uart_clear_rx_buffer() 제거: 이전 구독의 retained 메시지가 버퍼에
+    // 들어올 수 있으므로 클리어하지 않음. uart_wait_response는 버퍼 전체를 스캔함.
     for (int i = 0; i < 3; i++) {
-        uart_clear_rx_buffer();
         uart_send_at_command(cmd);
         
         if (uart_wait_response("OK", 3000)) {
@@ -205,11 +206,9 @@ bool mqtt_publish(MqttClient& client, const char* topic, const char* message, in
     
     char cmd[MAX_AT_COMMAND_LEN];
     
-    // RX 버퍼 클리어
-    uart_clear_rx_buffer();
-    sleep_ms(100);
-    
     // MQTTPUBRAW 명령 전송
+    // uart_clear_rx_buffer() 제거: publish 직전 클리어하면 이미 도착한
+    // +MQTTSUBRECV 메시지가 소거되어 디스플레이 업데이트가 누락됨.
     int cmd_len = snprintf(cmd, sizeof(cmd), "AT+MQTTPUBRAW=0,\"%s\",%d,%d,%d",
                            topic, msg_len, qos, retain);
     if (cmd_len >= (int)sizeof(cmd)) {

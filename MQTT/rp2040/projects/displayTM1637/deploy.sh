@@ -1,15 +1,24 @@
 #!/bin/bash
 # deploy.sh
 
-cd /home/kjw/Git/projects/MQTT/rp2040/projects/displayTM1637
-rm -rf build
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+UF2="build/rp2040_display_tm1637.uf2"
+
+# 빌드
 ./build.sh
 
-if [ $? -eq 0 ]; then
-    echo "✅ 빌드 성공!"
-    echo "UF2 파일: build/rp2040_display_tm1637.uf2"
-    echo "크기: $(du -h build/rp2040_display_tm1637.uf2 | cut -f1)"
-else
-    echo "❌ 빌드 실패!"
-    exit 1
-fi
+echo ""
+echo "UF2 파일: $UF2"
+echo "크기: $(du -h "$UF2" | cut -f1)"
+
+# picotool로 업로드 (BOOTSEL 모드 자동 진입 후 플래시)
+echo ""
+echo "📡 picotool로 업로드 중..."
+picotool load "$UF2" --force
+picotool reboot
+
+echo "✅ 업로드 완료!"

@@ -256,6 +256,11 @@ inline void update_all_displays()
 {
     for (int i = 0; i < NUM_DISPLAYS; i++)
     {
+        if (displays[i] == nullptr)
+        {
+            continue;
+        }
+
         if (display_data[i].valid)
         {
             // 최종 표시값 = 센서값 + 보정값

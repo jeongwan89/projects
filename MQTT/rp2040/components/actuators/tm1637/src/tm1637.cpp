@@ -167,13 +167,15 @@ void TM1637Display::showNumber(uint16_t number, bool show_leading_zero) {
 
 void TM1637Display::showFloat(float value, uint8_t decimal_places) {
     if (decimal_places > 3) decimal_places = 3;
-    
-    // 값의 범위 제한
-    if (value < 0) value = 0;
-    if (value > 999.9f) value = 999.9f;
-    
+
+    // 값의 범위 제한 (음수 지원: -99.9 ~ 999.9)
+    bool negative = (value < 0.0f);
+    float abs_value = negative ? -value : value;
+    if (negative && abs_value > 99.9f) abs_value = 99.9f;
+    if (!negative && abs_value > 999.9f) abs_value = 999.9f;
+
     // 소수점 1자리 고정으로 정수 변환 (예: 25.3 → 253)
-    int int_value = (int)(value * 10);
+    int int_value = (int)(abs_value * 10);
     
     uint8_t digits[4];
     
@@ -182,12 +184,20 @@ void TM1637Display::showFloat(float value, uint8_t decimal_places) {
     digits[2] = (int_value / 10) % 10;    // 일의 자리 (소수점 위치)
     digits[1] = (int_value / 100) % 10;   // 십의 자리
     digits[0] = (int_value / 1000) % 10;  // 백의 자리
-    
-    // 선행 0 처리 (백의 자리, 십의 자리)
-    bool started = false;
-    for (uint8_t i = 0; i < 2; i++) {
-        if (digits[i] != 0) started = true;
-        if (!started) digits[i] = 0xFF;  // 빈칸 표시
+
+    if (negative) {
+        // 음수는 첫 자리에 '-'를 표시하고, 나머지 2자리 정수 + 1자리 소수 표시
+        digits[0] = 0xFE; // minus sentinel
+        if (digits[1] == 0) {
+            digits[1] = 0xFF; // -x.x 형태에서 선행 0 제거
+        }
+    } else {
+        // 양수 선행 0 처리 (백의 자리, 십의 자리)
+        bool started = false;
+        for (uint8_t i = 0; i < 2; i++) {
+            if (digits[i] != 0) started = true;
+            if (!started) digits[i] = 0xFF;  // 빈칸 표시
+        }
     }
     
     // 데이터 명령 설정
@@ -199,9 +209,11 @@ void TM1637Display::showFloat(float value, uint8_t decimal_places) {
     start();
     writeByte(CMD_ADDR);
     
-    // 첫 번째 자리 (백의 자리 또는 빈칸)
+    // 첫 번째 자리 (백의 자리/마이너스/빈칸)
     if (digits[0] == 0xFF) {
         writeByte(0);
+    } else if (digits[0] == 0xFE) {
+        writeByte(0x40); // '-' (G 세그먼트)
     } else {
         writeByte(digitToSegment(digits[0]));
     }

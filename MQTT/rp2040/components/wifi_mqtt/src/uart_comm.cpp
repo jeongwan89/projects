@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/irq.h"
+#include "hardware/watchdog.h"
 #include "hardware/sync.h"  // save_and_disable_interrupts, restore_interrupts
 
 #define RX_BUFFER_SIZE 1024  // ESP-01 긴 응답 처리를 위해 복원
@@ -15,6 +16,35 @@ static uart_inst_t* g_uart = NULL;
 static volatile char rx_buffer[RX_BUFFER_SIZE];
 static volatile uint16_t rx_head = 0;  // 쓰기 위치 (생산자)
 static volatile uint16_t rx_tail = 0;  // 읽기 위치 (소비자)
+
+// +MQTTSUBRECV 보류 큐: uart_wait_response가 AT 응답(OK 등) 탐색 시
+// 앞에 쌓여 있던 +MQTTSUBRECV 라인들을 소멸시키지 않고 여기에 보존함
+#define MQTT_PENDING_QUEUE_SIZE 24
+#define MQTT_PENDING_MSG_LEN    256
+
+static char mqtt_pending_queue[MQTT_PENDING_QUEUE_SIZE][MQTT_PENDING_MSG_LEN];
+static int  mqtt_pending_head = 0;  // 쓰기 위치
+static int  mqtt_pending_tail = 0;  // 읽기 위치
+
+// data[0..len-1] 에서 +MQTTSUBRECV 라인을 추출해 보류 큐에 저장
+static void save_mqtt_messages_from(const char* data, int len) {
+    const char* p   = data;
+    const char* end = data + len;
+    while (p < end) {
+        const char* start = strstr(p, "+MQTTSUBRECV:");
+        if (!start || start >= end) break;
+        const char* lf = (const char*)memchr(start, '\n', end - start);
+        int msg_len = lf ? (int)(lf - start + 1) : (int)(end - start);
+        int next_head = (mqtt_pending_head + 1) % MQTT_PENDING_QUEUE_SIZE;
+        if (next_head != mqtt_pending_tail) {  // 큐가 가득 차지 않은 경우만
+            int copy_len = msg_len < MQTT_PENDING_MSG_LEN - 1 ? msg_len : MQTT_PENDING_MSG_LEN - 1;
+            memcpy(mqtt_pending_queue[mqtt_pending_head], start, copy_len);
+            mqtt_pending_queue[mqtt_pending_head][copy_len] = '\0';
+            mqtt_pending_head = next_head;
+        }
+        p = lf ? lf + 1 : end;
+    }
+}
 
 // UART RX 인터럽트 핸들러
 static void on_uart_rx(void) {
@@ -104,6 +134,9 @@ bool uart_wait_response(const char* expected, uint32_t timeout_ms) {
     static char temp_buf[RX_BUFFER_SIZE];
     
     while (to_ms_since_boot(get_absolute_time()) - start < timeout_ms) {
+        // 상위 로직이 블로킹 대기 중일 때 WDT 타임아웃 방지
+        watchdog_update();
+
         // Critical Section: 링버퍼 읽기 (ISR의 rx_head 업데이트와 충돌 방지)
         uint32_t irq_status = save_and_disable_interrupts();
         
@@ -120,11 +153,16 @@ bool uart_wait_response(const char* expected, uint32_t timeout_ms) {
         
         char* found = strstr(temp_buf, expected);
         if (found) {
+            int consume_len = (found - temp_buf) + strlen(expected);
+
+            // 소비 구간에 +MQTTSUBRECV 라인이 있으면 보류 큐에 보존
+            // (인터럽트 비활성화 전에 처리 — 문자열 연산이 길기 때문)
+            save_mqtt_messages_from(temp_buf, consume_len);
+
             // Critical Section: rx_tail 업데이트 보호
             irq_status = save_and_disable_interrupts();
             
             // 찾은 문자열까지 버퍼에서 소비
-            int consume_len = (found - temp_buf) + strlen(expected);
             for (int j = 0; j < consume_len && rx_tail != rx_head; j++) {
                 rx_tail = (rx_tail + 1) % RX_BUFFER_SIZE;
             }
@@ -203,6 +241,17 @@ int uart_read_mqtt_message(char* buffer, int max_len) {
         return 0;
     }
     
+    // 보류 큐 우선 확인: uart_wait_response 소비 과정에서 구제된 메시지
+    if (mqtt_pending_tail != mqtt_pending_head) {
+        const char* msg = mqtt_pending_queue[mqtt_pending_tail];
+        int len = (int)strlen(msg);
+        if (len >= max_len) len = max_len - 1;
+        memcpy(buffer, msg, len);
+        buffer[len] = '\0';
+        mqtt_pending_tail = (mqtt_pending_tail + 1) % MQTT_PENDING_QUEUE_SIZE;
+        return len;
+    }
+
     // Critical Section: 링버퍼 읽기 (ISR의 rx_head 업데이트와 충돌 방지)
     uint32_t irq_status = save_and_disable_interrupts();
     

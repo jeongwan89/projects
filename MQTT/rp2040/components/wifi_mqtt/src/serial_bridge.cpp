@@ -46,6 +46,9 @@ void serial_bridge_mode(uart_inst_t* uart) {
             putchar_raw(ch_uart);
         }
         
+        // WDT 타임아웃 방지 (serial_bridge는 장시간 대기 가능)
+        watchdog_update();
+
         tight_loop_contents();
     }
 }

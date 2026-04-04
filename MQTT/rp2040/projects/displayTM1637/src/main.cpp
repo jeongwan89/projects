@@ -118,16 +118,10 @@ int main(void)
         {
             printf("[오류] %s 디스플레이 초기화 실패 (CLK=%d, DIO=%d)\n",
                    display_names[i], display_pins[i][0], display_pins[i][1]);
-            // 이전 할당된 디스플레이 메모리 정리
-            for (int j = 0; j < i; j++)
-            {
-                if (displays[j] != nullptr)
-                {
-                    delete displays[j];
-                    displays[j] = nullptr;
-                }
-            }
-            emergency_shutdown("Display initialization failed", -3);
+            printf("[경고] %s 디스플레이 비활성화 후 계속 진행합니다.\n", display_names[i]);
+            delete displays[i];
+            displays[i] = nullptr;
+            continue;
         }
         displays[i]->setBrightness(TM1637_BRIGHTNESS);
         printf("[OK] %s 디스플레이 초기화 완료 (CLK=%d, DIO=%d)\n",
@@ -138,13 +132,19 @@ int main(void)
     printf("\n디스플레이 테스트 중...\n");
     for (int i = 0; i < NUM_DISPLAYS; i++)
     {
-        displays[i]->showNumber(8888, true);
+        if (displays[i] != nullptr)
+        {
+            displays[i]->showNumber(8888, true);
+        }
         watchdog_update(); // WDT 갱신
     }
     sleep_ms(1000);
     for (int i = 0; i < NUM_DISPLAYS; i++)
     {
-        displays[i]->clear();
+        if (displays[i] != nullptr)
+        {
+            displays[i]->clear();
+        }
     }
     printf("디스플레이 테스트 완료\n\n");
 
