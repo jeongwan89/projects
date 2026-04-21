@@ -43,14 +43,19 @@ RP2040 Pico 기반 4채널 모터 카트 컨트롤러 프로젝트입니다.
 - ESP01 RST: GPIO18 (active-low)
 
 ### DRV8871 (4 Units)
-- Motor1: PWM GPIO6, IN1 GPIO7, IN2 GPIO12
-- Motor2: PWM GPIO8, IN1 GPIO9, IN2 GPIO13
-- Motor3: PWM GPIO10, IN1 GPIO11, IN2 GPIO15
-- Motor4: PWM GPIO14, IN1 GPIO16, IN2 GPIO17
+- Motor1: IN1(GPIO7, PWM), IN2(GPIO6, PWM)
+- Motor2: IN1(GPIO9, PWM), IN2(GPIO8, PWM)
+- Motor3: IN1(GPIO11, PWM), IN2(GPIO10, PWM)
+- Motor4: IN1(GPIO16, PWM), IN2(GPIO17, PWM)
 
 ### 비상 스위치
 - Emergency Switch: GPIO22 (active-low, internal pull-up)
 - 스위치 배선: GPIO22 <-> 스위치 <-> GND
+
+### HC-SR04 (2 Units)
+- Sensor1: TRIG GPIO12, ECHO GPIO13
+- Sensor2: TRIG GPIO14, ECHO GPIO15
+- 임계 거리 이하(기본 100cm) 감지 시 모터 즉시 정지
 
 ---
 
@@ -60,17 +65,34 @@ RP2040 Pico 기반 4채널 모터 카트 컨트롤러 프로젝트입니다.
 - `FW`: 정회전
 - `BW`: 역회전
 - `Stop`: 정지
-- `Brake`: 브레이크(IN1=HIGH, IN2=HIGH)
+- `Brake`: 브레이크(IN1=100% PWM, IN2=100% PWM)
 
 ### 속도 명령(Speed)
 - 정수 `0~100`
 - 퍼센트 기반으로 PWM 듀티 변환
 
 ### DRV8871 동작
-- IN1=HIGH, IN2=LOW -> Forward
-- IN1=LOW, IN2=HIGH -> Backward
-- IN1=LOW, IN2=LOW -> Coast Stop
-- IN1=HIGH, IN2=HIGH -> Brake
+- Forward: IN1=PWM(speed), IN2=0% PWM
+- Backward: IN1=0% PWM, IN2=PWM(speed)
+- Coast Stop: IN1=0% PWM, IN2=0% PWM
+- Brake: IN1=100% PWM, IN2=100% PWM
+
+### DRV8871 Truth Table
+- IN1=0, IN2=0 -> High-Z (Coast)
+- IN1=PWM, IN2=0 -> FW
+- IN1=0, IN2=PWM -> BW
+- IN1=100%, IN2=100% -> Brake
+
+### 초음파 안전 정지
+- 폴링 주기: 100ms
+- 정지 임계값: 100cm 이하
+- 재개 임계값(히스테리시스): 120cm 이상
+- MQTT Publish:
+  - `Cart/1/Ultrasonic1/DistanceCm`
+  - `Cart/1/Ultrasonic2/DistanceCm`
+  - `Cart/1/Ultrasonic1/Valid`
+  - `Cart/1/Ultrasonic2/Valid`
+  - `Cart/1/Ultrasonic/Obstacle` (`Near`/`Clear`)
 
 ---
 
@@ -209,6 +231,7 @@ make -j
 ## 10) 배선 체크 포인트
 
 - ESP01 전원은 안정적인 3.3V 공급 사용
+- RP2040은 외부 3.3V 전원 사용을 전제로 `3V3_EN`을 의도적으로 disable한 설계
 - ESP01 `GPIO0/GPIO2/CH_PD`는 기본 부팅 조건에 맞게 pull-up 유지
 - RP2040, ESP01, DRV8871 GND 공통 접지
 - 모터 전원 라인에 노이즈 대책(벌크 캐패시터, 배선 길이 최소화) 권장

@@ -7,6 +7,7 @@
 #include "motor_driver.h"
 #include "esp01_adapter.h"
 #include "mqtt_adapter.h"
+#include "ultrasonic.h"
 
 // Emergency switch: active-low input with pull-up.
 #define EMERGENCY_SW_GPIO            22
@@ -16,11 +17,27 @@
 #define EMERGENCY_SWITCH_TOPIC       "Cart/1/EmergencySwitch"
 #define EMERGENCY_LATCH_TOPIC        "Cart/1/EmergencyLatch"
 
-#define WIFI_SSID                    "farmmain5g"
+#define WIFI_SSID                    "FarmMain5G"
 #define WIFI_PASSWORD                "wweerrtt"
 
 // ESP01 reset pin (active-low), separated from UART/motor/emergency pins.
 #define ESP01_RST_GPIO               18
+
+// HC-SR04 x2 pin reservation (4 GPIOs)
+#define US1_TRIG_GPIO                12
+#define US1_ECHO_GPIO                13
+#define US2_TRIG_GPIO                14
+#define US2_ECHO_GPIO                15
+
+#define ULTRASONIC_POLL_MS           100
+#define ULTRASONIC_STOP_CM           100.0f
+#define ULTRASONIC_CLEAR_CM          120.0f
+
+#define ULTRASONIC1_DISTANCE_TOPIC   "Cart/1/Ultrasonic1/DistanceCm"
+#define ULTRASONIC2_DISTANCE_TOPIC   "Cart/1/Ultrasonic2/DistanceCm"
+#define ULTRASONIC1_VALID_TOPIC      "Cart/1/Ultrasonic1/Valid"
+#define ULTRASONIC2_VALID_TOPIC      "Cart/1/Ultrasonic2/Valid"
+#define ULTRASONIC_OBSTACLE_TOPIC    "Cart/1/Ultrasonic/Obstacle"
 
 static volatile bool g_emergency_irq_pending = false;
 static volatile bool g_emergency_latched = false;
@@ -29,6 +46,16 @@ static bool g_publish_status_now = false;
 static bool g_emergency_status_inited = false;
 static bool g_last_switch_pressed = false;
 static bool g_last_latched_state = false;
+static bool g_obstacle_latched = false;
+static uint32_t g_last_ultrasonic_poll_ms = 0;
+static bool g_last_us1_valid = false;
+static bool g_last_us2_valid = false;
+static float g_last_us1_cm = 0.0f;
+static float g_last_us2_cm = 0.0f;
+static bool g_ultrasonic_status_inited = false;
+
+static ultrasonic_sensor_t g_us1;
+static ultrasonic_sensor_t g_us2;
 
 static uint8_t g_target_speed[MOTOR_COUNT] = {0};
 static motor_direction_t g_target_dir[MOTOR_COUNT] = {
@@ -40,6 +67,12 @@ static motor_direction_t g_target_dir[MOTOR_COUNT] = {
 
 static void apply_motor_target(motor_id_t motor_id)
 {
+    if (g_obstacle_latched) {
+        motor_stop(motor_id);
+        g_publish_status_now = true;
+        return;
+    }
+
     if (g_target_dir[motor_id] == MOTOR_STOP || g_target_speed[motor_id] == 0) {
         motor_stop(motor_id);
         g_publish_status_now = true;
@@ -191,6 +224,99 @@ static void safe_rearm_after_emergency(void)
     sleep_ms(50);
 }
 
+static bool ultrasonic_safety_init(void)
+{
+    bool ok1 = ultrasonic_init(&g_us1, US1_TRIG_GPIO, US1_ECHO_GPIO);
+    bool ok2 = ultrasonic_init(&g_us2, US2_TRIG_GPIO, US2_ECHO_GPIO);
+
+    return ok1 && ok2;
+}
+
+static void publish_ultrasonic_state(bool force)
+{
+    char payload[24];
+
+    if (!force && g_ultrasonic_status_inited == false) {
+        return;
+    }
+
+    if (g_last_us1_valid) {
+        snprintf(payload, sizeof(payload), "%.1f", g_last_us1_cm);
+        (void)mqtt_publish_text(ULTRASONIC1_DISTANCE_TOPIC, payload, 1, 0);
+    }
+    (void)mqtt_publish_text(ULTRASONIC1_VALID_TOPIC, g_last_us1_valid ? "1" : "0", 1, 0);
+
+    if (g_last_us2_valid) {
+        snprintf(payload, sizeof(payload), "%.1f", g_last_us2_cm);
+        (void)mqtt_publish_text(ULTRASONIC2_DISTANCE_TOPIC, payload, 1, 0);
+    }
+    (void)mqtt_publish_text(ULTRASONIC2_VALID_TOPIC, g_last_us2_valid ? "1" : "0", 1, 0);
+
+    (void)mqtt_publish_text(ULTRASONIC_OBSTACLE_TOPIC, g_obstacle_latched ? "Near" : "Clear", 1, 0);
+    g_ultrasonic_status_inited = true;
+}
+
+static void latch_obstacle_stop(float d1_cm, bool v1, float d2_cm, bool v2)
+{
+    if (g_obstacle_latched) {
+        return;
+    }
+
+    g_obstacle_latched = true;
+    for (int i = 0; i < MOTOR_COUNT; i++) {
+        g_target_speed[i] = 0;
+        g_target_dir[i] = MOTOR_STOP;
+    }
+    motor_stop_all();
+    g_publish_status_now = true;
+    (void)mqtt_publish_device_status("Obstacle", 1);
+
+    printf("[ULTRASONIC] Obstacle detected. US1=%s%.1fcm, US2=%s%.1fcm, motors stopped.\n",
+           v1 ? "" : "N/A ",
+           v1 ? d1_cm : 0.0f,
+           v2 ? "" : "N/A ",
+           v2 ? d2_cm : 0.0f);
+}
+
+static void poll_ultrasonic_safety(void)
+{
+    uint32_t now_ms = to_ms_since_boot(get_absolute_time());
+    if ((now_ms - g_last_ultrasonic_poll_ms) < ULTRASONIC_POLL_MS) {
+        return;
+    }
+    g_last_ultrasonic_poll_ms = now_ms;
+
+    float d1_cm = 0.0f;
+    float d2_cm = 0.0f;
+    bool v1 = ultrasonic_read_cm(&g_us1, &d1_cm);
+    bool v2 = ultrasonic_read_cm(&g_us2, &d2_cm);
+
+    g_last_us1_valid = v1;
+    g_last_us2_valid = v2;
+    g_last_us1_cm = d1_cm;
+    g_last_us2_cm = d2_cm;
+
+    if (!v1 && !v2) {
+        publish_ultrasonic_state(true);
+        return;
+    }
+
+    bool near = (v1 && d1_cm <= ULTRASONIC_STOP_CM) ||
+                (v2 && d2_cm <= ULTRASONIC_STOP_CM);
+    bool clear = (!v1 || d1_cm >= ULTRASONIC_CLEAR_CM) &&
+                 (!v2 || d2_cm >= ULTRASONIC_CLEAR_CM);
+
+    if (near) {
+        latch_obstacle_stop(d1_cm, v1, d2_cm, v2);
+    } else if (g_obstacle_latched && clear) {
+        g_obstacle_latched = false;
+        (void)mqtt_publish_device_status("Online", 1);
+        printf("[ULTRASONIC] Obstacle cleared. Motion commands re-enabled.\n");
+    }
+
+    publish_ultrasonic_state(true);
+}
+
 static void emergency_switch_irq_callback(uint gpio, uint32_t events)
 {
     if (gpio != EMERGENCY_SW_GPIO) {
@@ -231,6 +357,13 @@ int main(void)
     
     motor_init_all();
     emergency_switch_init();
+    if (!ultrasonic_safety_init()) {
+        printf("[ULTRASONIC] Sensor init failed. System stays in safe idle mode.\n");
+        while (1) {
+            motor_stop_all();
+            sleep_ms(200);
+        }
+    }
     
     printf("\n========================================\n");
     printf("Motor Cart Controller - RP2040 Pico\n");
@@ -239,6 +372,8 @@ int main(void)
     printf("ESP01 reset configured on GPIO%d (active-low).\n", ESP01_RST_GPIO);
     printf("Motor driver initialized (4 units).\n");
     printf("Emergency switch IRQ enabled on GPIO%d (active-low).\n", EMERGENCY_SW_GPIO);
+    printf("HC-SR04 reserved pins: US1(T%d/E%d), US2(T%d/E%d).\n",
+           US1_TRIG_GPIO, US1_ECHO_GPIO, US2_TRIG_GPIO, US2_ECHO_GPIO);
     
     // Wi-Fi 연결 먼저 수행
     if (!esp01_init_and_connect_wifi(ESP01_RST_GPIO, WIFI_SSID, WIFI_PASSWORD)) {
@@ -286,6 +421,7 @@ int main(void)
     uint32_t last_status_publish_ms = 0;
     g_publish_status_now = true;
     publish_emergency_state(true);
+    publish_ultrasonic_state(true);
     
     // 메인 루프
     while (1) {
@@ -324,6 +460,13 @@ int main(void)
             continue;
         }
 
+        poll_ultrasonic_safety();
+        if (g_obstacle_latched) {
+            publish_emergency_state(false);
+            sleep_ms(20);
+            continue;
+        }
+
         mqtt_run_maintenance();
 
         char topic[128] = {0};
@@ -335,6 +478,7 @@ int main(void)
         uint32_t now_ms = to_ms_since_boot(get_absolute_time());
         if (g_publish_status_now || (now_ms - last_status_publish_ms) >= MOTOR_STATUS_PUBLISH_MS) {
             publish_motor_states();
+            publish_ultrasonic_state(true);
             last_status_publish_ms = now_ms;
             g_publish_status_now = false;
         }

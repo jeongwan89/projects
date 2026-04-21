@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(NOT DEFINED ENV{PICO_SDK_PATH} AND EXISTS "/home/jeongwan/pico-sdk")
+    set(ENV{PICO_SDK_PATH} "/home/jeongwan/pico-sdk")
+endif()
+
 # Pico SDK 초기화
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
@@ -45,6 +51,18 @@ if(EXISTS ${WIFI_MQTT_PATH}/CMakeLists.txt)
     )
 else()
     message(WARNING "wifi_mqtt library not found at ${WIFI_MQTT_PATH}")
+endif()
+
+# ultraSonic 라이브러리 추가 (rp2040/components/sensors/ultraSonic)
+set(ULTRASONIC_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../components/sensors/ultraSonic)
+if(EXISTS ${ULTRASONIC_PATH}/CMakeLists.txt)
+    add_subdirectory(${ULTRASONIC_PATH}
+                     ${CMAKE_CURRENT_BINARY_DIR}/ultraSonic)
+    target_link_libraries(${PROJECT_NAME}
+        ultraSonic
+    )
+else()
+    message(WARNING "ultraSonic library not found at ${ULTRASONIC_PATH}")
 endif()
 
 # UF2 파일 생성 (Pico 부팅로더용)

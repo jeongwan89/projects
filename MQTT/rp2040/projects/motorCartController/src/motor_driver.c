@@ -6,18 +6,15 @@
 #include "pico/stdlib.h"
 
 typedef struct {
-    uint pwm_pin;
     uint in1_pin;
     uint in2_pin;
-    uint slice;
-    uint channel;
 } motor_hw_t;
 
 static const motor_hw_t g_motor_hw[MOTOR_COUNT] = {
-    {MOTOR1_PWM_PIN, MOTOR1_IN1_PIN, MOTOR1_IN2_PIN, MOTOR1_PWM_SLICE, MOTOR1_PWM_CHAN},
-    {MOTOR2_PWM_PIN, MOTOR2_IN1_PIN, MOTOR2_IN2_PIN, MOTOR2_PWM_SLICE, MOTOR2_PWM_CHAN},
-    {MOTOR3_PWM_PIN, MOTOR3_IN1_PIN, MOTOR3_IN2_PIN, MOTOR3_PWM_SLICE, MOTOR3_PWM_CHAN},
-    {MOTOR4_PWM_PIN, MOTOR4_IN1_PIN, MOTOR4_IN2_PIN, MOTOR4_PWM_SLICE, MOTOR4_PWM_CHAN},
+    {MOTOR1_IN1_PIN, MOTOR1_IN2_PIN},
+    {MOTOR2_IN1_PIN, MOTOR2_IN2_PIN},
+    {MOTOR3_IN1_PIN, MOTOR3_IN2_PIN},
+    {MOTOR4_IN1_PIN, MOTOR4_IN2_PIN},
 };
 
 static motor_state_t g_motor_state[MOTOR_COUNT];
@@ -27,41 +24,47 @@ static bool motor_id_valid(motor_id_t motor_id)
     return motor_id >= MOTOR_1 && motor_id < MOTOR_COUNT;
 }
 
-static void apply_pwm_level(motor_id_t motor_id, uint16_t level)
+static void set_pin_pwm_level(uint pin, uint16_t level)
 {
-    const motor_hw_t *hw = &g_motor_hw[motor_id];
-    pwm_set_chan_level(hw->slice, hw->channel, level);
-    g_motor_state[motor_id].pwm_level = level;
+    uint slice = pwm_gpio_to_slice_num(pin);
+    uint channel = pwm_gpio_to_channel(pin);
+    pwm_set_chan_level(slice, channel, level);
 }
 
-static void apply_direction(motor_id_t motor_id, motor_direction_t direction)
+static void apply_drive(motor_id_t motor_id, uint16_t level, motor_direction_t direction)
 {
     const motor_hw_t *hw = &g_motor_hw[motor_id];
+    uint16_t in1_level = 0;
+    uint16_t in2_level = 0;
 
     switch (direction) {
     case MOTOR_FORWARD:
-        gpio_put(hw->in1_pin, 1);
-        gpio_put(hw->in2_pin, 0);
+        in1_level = level;
+        in2_level = 0;
         break;
     case MOTOR_BACKWARD:
-        gpio_put(hw->in1_pin, 0);
-        gpio_put(hw->in2_pin, 1);
+        in1_level = 0;
+        in2_level = level;
         break;
     case MOTOR_STOP:
     default:
-        gpio_put(hw->in1_pin, 0);
-        gpio_put(hw->in2_pin, 0);
+        in1_level = 0;
+        in2_level = 0;
         break;
     }
 
+    set_pin_pwm_level(hw->in1_pin, in1_level);
+    set_pin_pwm_level(hw->in2_pin, in2_level);
+    g_motor_state[motor_id].pwm_level = level;
     g_motor_state[motor_id].direction = direction;
 }
 
 static void apply_brake(motor_id_t motor_id)
 {
     const motor_hw_t *hw = &g_motor_hw[motor_id];
-    gpio_put(hw->in1_pin, 1);
-    gpio_put(hw->in2_pin, 1);
+    set_pin_pwm_level(hw->in1_pin, PWM_MAX_LEVEL);
+    set_pin_pwm_level(hw->in2_pin, PWM_MAX_LEVEL);
+    g_motor_state[motor_id].pwm_level = 0;
     g_motor_state[motor_id].direction = MOTOR_STOP;
 }
 
@@ -80,23 +83,21 @@ void motor_init(motor_id_t motor_id)
     }
 
     const motor_hw_t *hw = &g_motor_hw[motor_id];
+    uint slice_in1 = pwm_gpio_to_slice_num(hw->in1_pin);
+    uint slice_in2 = pwm_gpio_to_slice_num(hw->in2_pin);
 
-    gpio_set_function(hw->pwm_pin, GPIO_FUNC_PWM);
-    gpio_init(hw->in1_pin);
-    gpio_set_dir(hw->in1_pin, GPIO_OUT);
-    gpio_put(hw->in1_pin, 0);
-
-    gpio_init(hw->in2_pin);
-    gpio_set_dir(hw->in2_pin, GPIO_OUT);
-    gpio_put(hw->in2_pin, 0);
+    gpio_set_function(hw->in1_pin, GPIO_FUNC_PWM);
+    gpio_set_function(hw->in2_pin, GPIO_FUNC_PWM);
 
     pwm_config cfg = pwm_get_default_config();
     pwm_config_set_clkdiv(&cfg, 2.5f); // 125MHz / 2.5 / 2500 = 20kHz
     pwm_config_set_wrap(&cfg, PWM_WRAP);
-    pwm_init(hw->slice, &cfg, true);
+    pwm_init(slice_in1, &cfg, true);
+    if (slice_in2 != slice_in1) {
+        pwm_init(slice_in2, &cfg, true);
+    }
 
-    apply_pwm_level(motor_id, 0);
-    apply_direction(motor_id, MOTOR_STOP);
+    apply_drive(motor_id, 0, MOTOR_STOP);
 }
 
 void motor_init_all(void)
@@ -113,13 +114,11 @@ void motor_set_speed_direction(motor_id_t motor_id, uint8_t speed, motor_directi
     }
 
     if (direction == MOTOR_STOP || speed == 0) {
-        apply_pwm_level(motor_id, 0);
-        apply_direction(motor_id, MOTOR_STOP);
+        apply_drive(motor_id, 0, MOTOR_STOP);
         return;
     }
 
-    apply_direction(motor_id, direction);
-    apply_pwm_level(motor_id, percent_to_pwm_level(speed));
+    apply_drive(motor_id, percent_to_pwm_level(speed), direction);
 }
 
 void motor_forward(motor_id_t motor_id, uint8_t speed)
@@ -138,8 +137,7 @@ void motor_stop(motor_id_t motor_id)
         return;
     }
 
-    apply_pwm_level(motor_id, 0);
-    apply_direction(motor_id, MOTOR_STOP);
+    apply_drive(motor_id, 0, MOTOR_STOP);
 }
 
 void motor_stop_all(void)
@@ -155,7 +153,6 @@ void motor_brake(motor_id_t motor_id)
         return;
     }
 
-    apply_pwm_level(motor_id, 0);
     apply_brake(motor_id);
 }
 

@@ -8,73 +8,41 @@
 
 /* ============================================
    DRV8871 모터 드라이버 설정 (4 Units)
-   
-   잡음 최소화 고려:
-   - 각 모터마다 서로 다른 PWM 슬라이스 사용
-   - GPIO 핀들을 물리적으로 분산 (PWM과 방향 핀 분리)
-   - UART 핀(GPIO4, 5)과 분리
-   - 고주파 영역(GPIO0-3) 회피
-   
+
+   DRV8871은 IN1/IN2 두 입력으로 구동하며,
+   두 핀 모두 PWM 신호로 제어한다.
+   - 정회전: IN1=PWM(speed), IN2=0%
+   - 역회전: IN1=0%, IN2=PWM(speed)
+   - 정지(코스트/High-Z): IN1=0%, IN2=0%
+   - 브레이크: IN1=100%, IN2=100%
+
    GPIO 할당 맵:
-   GPIO0-3:   [회피] 고주파 영역
    GPIO4-5:   [UART] ESP01 통신
-   GPIO6:     Motor1 PWM (PWM3-A)
-   GPIO7:     Motor1 IN1 (정회전 제어)
-   GPIO8:     Motor2 PWM (PWM4-A)
-   GPIO9:     Motor2 IN1 (정회전 제어)
-   GPIO10:    Motor3 PWM (PWM5-A)
-   GPIO11:    Motor3 IN1 (정회전 제어)
-   GPIO12:    Motor1 IN2 (역회전 제어)
-   GPIO13:    Motor2 IN2 (역회전 제어)
-   GPIO14:    Motor4 PWM (PWM7-A)
-   GPIO15:    Motor3 IN2 (역회전 제어)
-   GPIO16:    Motor4 IN1 (정회전 제어)
-   GPIO17:    Motor4 IN2 (역회전 제어)
+   GPIO6:     Motor1 IN2 (PWM)
+   GPIO7:     Motor1 IN1 (PWM)
+   GPIO8:     Motor2 IN2 (PWM)
+   GPIO9:     Motor2 IN1 (PWM)
+   GPIO10:    Motor3 IN2 (PWM)
+   GPIO11:    Motor3 IN1 (PWM)
+   GPIO16:    Motor4 IN1 (PWM)
+   GPIO17:    Motor4 IN2 (PWM)
    ============================================ */
 
-/* ==================== 모터 1 ====================
-   PWM: GPIO6 (PWM3 Channel A) - 속도 제어
-   IN1: GPIO7 - 정회전 제어
-   IN2: GPIO12 - 역회전 제어
-   */
-#define MOTOR1_PWM_PIN      6
-#define MOTOR1_PWM_SLICE    pwm_gpio_to_slice_num(MOTOR1_PWM_PIN)
-#define MOTOR1_PWM_CHAN     pwm_gpio_to_channel(MOTOR1_PWM_PIN)
-#define MOTOR1_IN1_PIN      7       // 정회전
-#define MOTOR1_IN2_PIN      12      // 역회전
+/* ==================== 모터 1 ==================== */
+#define MOTOR1_IN1_PIN      7
+#define MOTOR1_IN2_PIN      6
 
-/* ==================== 모터 2 ====================
-   PWM: GPIO8 (PWM4 Channel A) - 속도 제어
-   IN1: GPIO9 - 정회전 제어
-   IN2: GPIO13 - 역회전 제어
-   */
-#define MOTOR2_PWM_PIN      8
-#define MOTOR2_PWM_SLICE    pwm_gpio_to_slice_num(MOTOR2_PWM_PIN)
-#define MOTOR2_PWM_CHAN     pwm_gpio_to_channel(MOTOR2_PWM_PIN)
-#define MOTOR2_IN1_PIN      9       // 정회전
-#define MOTOR2_IN2_PIN      13      // 역회전
+/* ==================== 모터 2 ==================== */
+#define MOTOR2_IN1_PIN      9
+#define MOTOR2_IN2_PIN      8
 
-/* ==================== 모터 3 ====================
-   PWM: GPIO10 (PWM5 Channel A) - 속도 제어
-   IN1: GPIO11 - 정회전 제어
-   IN2: GPIO15 - 역회전 제어
-   */
-#define MOTOR3_PWM_PIN      10
-#define MOTOR3_PWM_SLICE    pwm_gpio_to_slice_num(MOTOR3_PWM_PIN)
-#define MOTOR3_PWM_CHAN     pwm_gpio_to_channel(MOTOR3_PWM_PIN)
-#define MOTOR3_IN1_PIN      11      // 정회전
-#define MOTOR3_IN2_PIN      15      // 역회전
+/* ==================== 모터 3 ==================== */
+#define MOTOR3_IN1_PIN      11
+#define MOTOR3_IN2_PIN      10
 
-/* ==================== 모터 4 ====================
-   PWM: GPIO14 (PWM7 Channel A) - 속도 제어
-   IN1: GPIO16 - 정회전 제어
-   IN2: GPIO17 - 역회전 제어
-   */
-#define MOTOR4_PWM_PIN      14
-#define MOTOR4_PWM_SLICE    pwm_gpio_to_slice_num(MOTOR4_PWM_PIN)
-#define MOTOR4_PWM_CHAN     pwm_gpio_to_channel(MOTOR4_PWM_PIN)
-#define MOTOR4_IN1_PIN      16      // 정회전
-#define MOTOR4_IN2_PIN      17      // 역회전
+/* ==================== 모터 4 ==================== */
+#define MOTOR4_IN1_PIN      16
+#define MOTOR4_IN2_PIN      17
 
 /* 모터 ID 정의 */
 typedef enum {
@@ -154,7 +122,7 @@ void motor_stop(motor_id_t motor_id);
 void motor_stop_all(void);
 
 /**
- * 모터 브레이크 (IN1=HIGH, IN2=HIGH)
+ * 모터 브레이크 (IN1=100% PWM, IN2=100% PWM)
  * @param motor_id: 모터 ID
  */
 void motor_brake(motor_id_t motor_id);
