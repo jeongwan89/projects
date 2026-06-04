@@ -35,6 +35,19 @@ RP2040 Pico 기반 4채널 모터 카트 컨트롤러 프로젝트입니다.
 
 ---
 
+## 0) 추가 컴포넌트 의존성
+
+이 프로젝트는 루트 디렉토리 기준 상위 `components` 디렉토리의 다음 서브모듈에 의존합니다.
+
+- `components/wifi_mqtt`
+  - `esp01.h`, `mqtt_client.h` 등 ESP01 Wi-Fi 및 MQTT 통신 라이브러리
+- `components/sensors/ultraSonic`
+  - `ultrasonic.h` 기반 HC-SR04 초음파 안전정지 라이브러리
+
+`CMakeLists.txt`는 위 경로를 서브디렉토리로 추가하므로, 해당 컴포넌트 디렉토리가 없으면 빌드 경고 또는 실패가 발생할 수 있습니다.
+
+---
+
 ## 2) 하드웨어 핀맵
 
 ### UART / ESP01
@@ -111,6 +124,9 @@ RP2040 Pico 기반 4채널 모터 카트 컨트롤러 프로젝트입니다.
 ### Client ID
 - RP2040 고유 ID 기반
 - 형식: `rp2040-<unique_hex>`
+
+> 참고: 현재 Wi-Fi 연결 정보는 `src/main.c` 내부의 `WIFI_SSID` / `WIFI_PASSWORD` 매크로에 하드코딩되어 있습니다.
+> 실제 배포 시에는 해당 값을 환경에 맞게 수정하거나, 보안 저장소로 분리하는 것이 좋습니다.
 
 ---
 
@@ -211,6 +227,9 @@ RP2040 Pico 기반 4채널 모터 카트 컨트롤러 프로젝트입니다.
 사전 조건:
 - Pico SDK 설치
 - `PICO_SDK_PATH` 환경변수 설정
+
+> 참고: `CMakeLists.txt`는 `PICO_SDK_PATH`가 설정되지 않았을 때 `/home/jeongwan/pico-sdk`를 기본 검색합니다.
+> 시스템에 다른 Pico SDK 경로를 사용하는 경우, 반드시 정확한 경로를 `PICO_SDK_PATH`에 설정하세요.
 
 예시:
 
