@@ -1,0 +1,214 @@
+# Home Assistant MQTT package for the RP2040 motor cart controller
+#
+# Add the following to configuration.yaml:
+#
+# homeassistant:
+#   packages:
+#     motor_cart_controller: !include motor.yaml
+
+mqtt:
+  switch:
+    - platform: mqtt
+      name: "Motor 1 Forward"
+      unique_id: "motor_cart_motor1_forward"
+      command_topic: "Cart/1/Motor1/Dir"
+      state_topic: "Cart/1/Motor1/StateDir"
+      payload_on: "FW"
+      payload_off: "Stop"
+      state_on: "FW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-right-bold
+
+    - platform: mqtt
+      name: "Motor 1 Stop"
+      unique_id: "motor_cart_motor1_stop"
+      command_topic: "Cart/1/Motor1/Dir"
+      state_topic: "Cart/1/Motor1/StateDir"
+      payload_on: "Stop"
+      payload_off: "Stop"
+      state_on: "Stop"
+      state_off: "FW"
+      qos: 1
+      retain: true
+      icon: mdi:stop-circle-outline
+
+    - platform: mqtt
+      name: "Motor 1 Backward"
+      unique_id: "motor_cart_motor1_backward"
+      command_topic: "Cart/1/Motor1/Dir"
+      state_topic: "Cart/1/Motor1/StateDir"
+      payload_on: "BW"
+      payload_off: "Stop"
+      state_on: "BW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-left-bold
+
+    - platform: mqtt
+      name: "Motor 2 Forward"
+      unique_id: "motor_cart_motor2_forward"
+      command_topic: "Cart/1/Motor2/Dir"
+      state_topic: "Cart/1/Motor2/StateDir"
+      payload_on: "FW"
+      payload_off: "Stop"
+      state_on: "FW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-right-bold
+
+    - platform: mqtt
+      name: "Motor 2 Stop"
+      unique_id: "motor_cart_motor2_stop"
+      command_topic: "Cart/1/Motor2/Dir"
+      state_topic: "Cart/1/Motor2/StateDir"
+      payload_on: "Stop"
+      payload_off: "Stop"
+      state_on: "Stop"
+      state_off: "FW"
+      qos: 1
+      retain: true
+      icon: mdi:stop-circle-outline
+
+    - platform: mqtt
+      name: "Motor 2 Backward"
+      unique_id: "motor_cart_motor2_backward"
+      command_topic: "Cart/1/Motor2/Dir"
+      state_topic: "Cart/1/Motor2/StateDir"
+      payload_on: "BW"
+      payload_off: "Stop"
+      state_on: "BW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-left-bold
+
+    - platform: mqtt
+      name: "Motor 3 Forward"
+      unique_id: "motor_cart_motor3_forward"
+      command_topic: "Cart/1/Motor3/Dir"
+      state_topic: "Cart/1/Motor3/StateDir"
+      payload_on: "FW"
+      payload_off: "Stop"
+      state_on: "FW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-right-bold
+
+    - platform: mqtt
+      name: "Motor 3 Stop"
+      unique_id: "motor_cart_motor3_stop"
+      command_topic: "Cart/1/Motor3/Dir"
+      state_topic: "Cart/1/Motor3/StateDir"
+      payload_on: "Stop"
+      payload_off: "Stop"
+      state_on: "Stop"
+      state_off: "FW"
+      qos: 1
+      retain: true
+      icon: mdi:stop-circle-outline
+
+    - platform: mqtt
+      name: "Motor 3 Backward"
+      unique_id: "motor_cart_motor3_backward"
+      command_topic: "Cart/1/Motor3/Dir"
+      state_topic: "Cart/1/Motor3/StateDir"
+      payload_on: "BW"
+      payload_off: "Stop"
+      state_on: "BW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-left-bold
+
+    - platform: mqtt
+      name: "Motor 4 Forward"
+      unique_id: "motor_cart_motor4_forward"
+      command_topic: "Cart/1/Motor4/Dir"
+      state_topic: "Cart/1/Motor4/StateDir"
+      payload_on: "FW"
+      payload_off: "Stop"
+      state_on: "FW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-right-bold
+
+    - platform: mqtt
+      name: "Motor 4 Stop"
+      unique_id: "motor_cart_motor4_stop"
+      command_topic: "Cart/1/Motor4/Dir"
+      state_topic: "Cart/1/Motor4/StateDir"
+      payload_on: "Stop"
+      payload_off: "Stop"
+      state_on: "Stop"
+      state_off: "FW"
+      qos: 1
+      retain: true
+      icon: mdi:stop-circle-outline
+
+    - platform: mqtt
+      name: "Motor 4 Backward"
+      unique_id: "motor_cart_motor4_backward"
+      command_topic: "Cart/1/Motor4/Dir"
+      state_topic: "Cart/1/Motor4/StateDir"
+      payload_on: "BW"
+      payload_off: "Stop"
+      state_on: "BW"
+      state_off: "Stop"
+      qos: 1
+      retain: true
+      icon: mdi:arrow-left-bold
+
+  number:
+    - platform: mqtt
+      name: "Motor 1 Speed"
+      unique_id: "motor_cart_motor1_speed"
+      command_topic: "Cart/1/Motor1/Speed"
+      state_topic: "Cart/1/Motor1/StateSpeed"
+      min: 0
+      max: 100
+      step: 1
+      mode: slider
+      qos: 1
+      retain: true
+
+    - platform: mqtt
+      name: "Motor 2 Speed"
+      unique_id: "motor_cart_motor2_speed"
+      command_topic: "Cart/1/Motor2/Speed"
+      state_topic: "Cart/1/Motor2/StateSpeed"
+      min: 0
+      max: 100
+      step: 1
+      mode: slider
+      qos: 1
+      retain: true
+
+    - platform: mqtt
+      name: "Motor 3 Speed"
+      unique_id: "motor_cart_motor3_speed"
+      command_topic: "Cart/1/Motor3/Speed"
+      state_topic: "Cart/1/Motor3/StateSpeed"
+      min: 0
+      max: 100
+      step: 1
+      mode: slider
+      qos: 1
+      retain: true
+
+    - platform: mqtt
+      name: "Motor 4 Speed"
+      unique_id: "motor_cart_motor4_speed"
+      command_topic: "Cart/1/Motor4/Speed"
+      state_topic: "Cart/1/Motor4/StateSpeed"
+      min: 0
+      max: 100
+      step: 1
+      mode: slider
+      qos: 1
+      retain: true

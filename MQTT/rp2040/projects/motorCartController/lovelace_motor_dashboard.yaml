@@ -1,0 +1,53 @@
+title: Motor Cart Controller
+path: motor-cart-controller+
+type: masonry
+cards:
+  - type: markdown
+    title: Motor Cart Controller
+    content: |
+      RP2040 모터 제어판입니다.
+      MQTT 토픽으로 각 모터를 Forward / Stop / Backward 및 속도 조절할 수 있습니다.
+
+  - type: vertical-stack
+    title: Motor 1
+    cards:
+      - type: entities
+        title: Motor 1 Controls
+        entities:
+          - switch.motor_1_forward
+          - switch.motor_1_stop
+          - switch.motor_1_backward
+          - number.motor_1_speed
+
+  - type: vertical-stack
+    title: Motor 2
+    cards:
+      - type: entities
+        title: Motor 2 Controls
+        entities:
+          - switch.motor_2_forward
+          - switch.motor_2_stop
+          - switch.motor_2_backward
+          - number.motor_2_speed
+
+  - type: vertical-stack
+    title: Motor 3
+    cards:
+      - type: entities
+        title: Motor 3 Controls
+        entities:
+          - switch.motor_3_forward
+          - switch.motor_3_stop
+          - switch.motor_3_backward
+          - number.motor_3_speed
+
+  - type: vertical-stack
+    title: Motor 4
+    cards:
+      - type: entities
+        title: Motor 4 Controls
+        entities:
+          - switch.motor_4_forward
+          - switch.motor_4_stop
+          - switch.motor_4_backward
+          - number.motor_4_speed
